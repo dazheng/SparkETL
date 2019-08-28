@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Configuration status="WARN" monitorInterval="300">
+    <properties>
+        <property name="LOG_ROOT">c://dp/log</property>
+        <property name="FILE_NAME">etl</property>
+    </properties>
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}–[%t] %-5level -%l - %msg%n" />
+        </Console>
+        <RollingRandomAccessFile name="MainFile" fileName="${LOG_ROOT}/${FILE_NAME}.log" filePattern="${LOG_ROOT}/$${date:yyyy-MM}/${FILE_NAME}-%d{yyyy-MM-dd HH}-%i.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}–[%t] %-5level -%l - %msg%n" />
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" />
+                <SizeBasedTriggeringPolicy size="50 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="20" />
+        </RollingRandomAccessFile>
+    </Appenders>
+
+    <Loggers>
+        <Logger name="main" level="trace" additivity="false">
+            <AppenderRef ref="MainFile" />
+        </Logger>
+        <Root level="error">
+            <AppenderRef ref="Console" />
+            <AppenderRef ref="MainFile" />
+        </Root>
+    </Loggers>
+</Configuration>

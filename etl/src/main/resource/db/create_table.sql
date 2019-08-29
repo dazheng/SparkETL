@@ -79,19 +79,22 @@ values (15, '2019-11-11', '2018-11-11', current_timestamp, current_timestamp);
 
 -- ============================= hive ======================================
 create database test;
+create database dm;
+
+use test;
 create table s_holiday
 (
     id           int,
-    create_time  datetime ,
-    update_time  datetime ,
+    create_time  timestamp ,
+    update_time  timestamp ,
     holiday_type int      ,
     begin_date   date     ,
     end_date     date
 );
 
+use dm;
 create table m_holiday
 (holiday_type int,
 cnt int
 );
 
---

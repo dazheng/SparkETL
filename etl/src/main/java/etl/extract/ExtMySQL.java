@@ -12,6 +12,6 @@ public class ExtMySQL extends Extract {
     }
 
     public void dpFull() {
-        exeExtractSqls(Func.readSqlFile(this.sqlDir + "dp.sql"));
+        exeExtractSqls(Func.readSqlFile(this.sqlDir + "dp_d.sql"));
     }
 }

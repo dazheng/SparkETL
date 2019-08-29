@@ -12,6 +12,6 @@ public class ExpMySQL extends Export {
     }
 
     public void dpD() {
-        exeLoadSqls(Func.readSqlFile(this.sqlDir + "dp.sql"));
+        exeLoadSqls(Func.readSqlFile(this.sqlDir + "dp_d.sql"));
     }
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Configuration status="WARN" monitorInterval="300">
     <properties>
-        <property name="LOG_ROOT">c://dp/log</property>
+        <property name="LOG_ROOT">c://dp/log/</property>
         <property name="FILE_NAME">etl</property>
     </properties>
     <Appenders>
@@ -19,7 +19,7 @@
     </Appenders>
 
     <Loggers>
-        <Logger name="main" level="trace" additivity="false">
+        <Logger name="main" level="debug" additivity="false">
             <AppenderRef ref="MainFile" />
         </Logger>
         <Root level="error">

@@ -88,7 +88,7 @@ public class Func {
     }
 
     public static Toml getParameters() {
-        String file = getProcPath() + "/resource/conf.toml";
+        String file = getProcPath() + "/config/conf.toml";
         return new Toml().read(new File(file));
     }
 }

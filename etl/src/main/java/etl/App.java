@@ -12,7 +12,7 @@ public final class App {
     private App() {
     }
 
-    public static void job(String jobName, String master, Integer timeType, String timeID, Integer backDate) {
+    private static void job(String jobName, String master, Integer timeType, String timeID, Integer backDate) {
         Dispatch disp = new Dispatch(master, timeType, timeID, backDate);
         switch (jobName) {
             case "prod":
@@ -22,9 +22,11 @@ public final class App {
 
     public static void main(String[] args) {
         final Logger logger = LogManager.getLogger();
-        final String MASTER = "spark://192.168.1.31:7077";
+        logger.debug("start");
+//        final String MASTER = "spark://192.168.1.39:7077";
+        final String MASTER = "yarn";
         Integer backDate = 7;
-        String jobName = "tmp";
+        String jobName = "prod";
         int timeType = 1;
         String timeID = LocalDate.now().plusDays(-1).toString();
 

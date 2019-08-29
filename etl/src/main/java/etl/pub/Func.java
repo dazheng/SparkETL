@@ -80,7 +80,7 @@ public class Func {
         try {
             File files = new File("");
             filePath = files.getCanonicalPath();
-
+            logger.debug("proc path is: %s", filePath);
         } catch (IOException e) {
             e.printStackTrace();
         }

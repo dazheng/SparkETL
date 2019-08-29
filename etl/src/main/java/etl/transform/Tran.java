@@ -12,6 +12,6 @@ public class Tran extends Transform {
     }
 
     public void s2iD() {
-        exeSqls(readSqlFile(sqlDir + "s2m_d.sql"));
+        exeSqls(Func.readSqlFile(sqlDir + "s2m_d.sql"));
     }
 }

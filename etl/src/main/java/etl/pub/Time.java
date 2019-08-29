@@ -3,12 +3,11 @@ package etl.pub;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.Map;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.Map;
 
 public class Time {
     private final Logger logger = LogManager.getLogger();

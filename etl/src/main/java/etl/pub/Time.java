@@ -21,6 +21,14 @@ public class Time {
     private DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
     private DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    Time(Integer timeType, String timeID, Integer backDate, Integer frequency) {
+        this.timeType = timeType;
+        this.timeID = timeID;
+        this.backDate = backDate;
+        this.frequency = frequency;
+        this.timeParas = generateTimeParameters();
+    }
+
     Integer getTimeType() {
         return timeType;
     }
@@ -40,15 +48,6 @@ public class Time {
     Map<String, String> getTimeParameters() {
         return timeParas;
     }
-
-    Time(Integer timeType, String timeID, Integer backDate, Integer frequency) {
-        this.timeType = timeType;
-        this.timeID = timeID;
-        this.backDate = backDate;
-        this.frequency = frequency;
-        this.timeParas = generateTimeParameters();
-    }
-
 
     private Map<String, String> generateTimeParameters() {
         String startTimeID = "";

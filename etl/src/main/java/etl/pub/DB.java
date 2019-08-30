@@ -37,55 +37,6 @@ public class DB {
         this.conn = connection();
     }
 
-    void release() {
-        close(this.conn);
-    }
-
-    private Toml getDB() {
-        Toml toml = Func.getParameters();
-        List<Toml> dbs = toml.getTables("db");
-        for (Toml db : dbs) {
-            if (db.getString("id").equals(this.id)) {
-                return db;
-            }
-        }
-        return null;
-    }
-
-    @NotNull
-    private Connection getConnection() {
-        return this.conn;
-    }
-
-    @NotNull
-    private Connection connection() {
-        // 1.注册驱动
-        try {
-            Class.forName(this.driverClass);
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-
-        }
-
-        // 2.创建Connection(数据库连接对象)
-        Connection conn = null;
-        try {
-            conn = DriverManager.getConnection(this.jdbcUrl, this.user, this.password);
-            conn.setAutoCommit(false);
-            return conn;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            this.logger.error(e);
-        }
-        /*
-         * Connection是Statement的工厂，一个Connection可以生产多个Statement。
-         * Statement是ResultSet的工厂，一个Statement却只能对应一个ResultSet（它们是一一对应的关系）。
-         * 所以在一段程序里要用多个ResultSet的时候，必须再Connection中获得多个Statement，
-         * 然后一个Statement对应一个ResultSet。
-         */
-        return null;
-    }
-
     /**
      * 关闭连接(数据库连接对象)
      *
@@ -170,6 +121,55 @@ public class DB {
         return s;
     }
 
+    void release() {
+        close(this.conn);
+    }
+
+    private Toml getDB() {
+        Toml toml = Func.getParameters();
+        List<Toml> dbs = toml.getTables("db");
+        for (Toml db : dbs) {
+            if (db.getString("id").equals(this.id)) {
+                return db;
+            }
+        }
+        return null;
+    }
+
+    @NotNull
+    private Connection getConnection() {
+        return this.conn;
+    }
+
+    @NotNull
+    private Connection connection() {
+        // 1.注册驱动
+        try {
+            Class.forName(this.driverClass);
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+
+        }
+
+        // 2.创建Connection(数据库连接对象)
+        Connection conn = null;
+        try {
+            conn = DriverManager.getConnection(this.jdbcUrl, this.user, this.password);
+            conn.setAutoCommit(false);
+            return conn;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            this.logger.error(e);
+        }
+        /*
+         * Connection是Statement的工厂，一个Connection可以生产多个Statement。
+         * Statement是ResultSet的工厂，一个Statement却只能对应一个ResultSet（它们是一一对应的关系）。
+         * 所以在一段程序里要用多个ResultSet的时候，必须再Connection中获得多个Statement，
+         * 然后一个Statement对应一个ResultSet。
+         */
+        return null;
+    }
+
     private DataFrameReader jdbcReader(@NotNull SparkSession session, String sql) {
         return session.read().format("jdbc").option("url", this.jdbcUrl).option("dbtable", sql)
             .option("user", this.user).option("password", this.password);
@@ -223,8 +223,10 @@ public class DB {
         ResultSet rs = null;
         String s = "";
         try {
+            String[] urls = this.jdbcUrl.split("/");
+            String schema = urls[urls.length - 1];
             stmt = getConnection().prepareStatement(sql);
-            stmt.setString(1, "schema"); // TODO:
+            stmt.setString(1, schema);
             stmt.setString(2, table);
             rs = stmt.executeQuery(sql);
             while (rs.next()) {

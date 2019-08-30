@@ -1,4 +1,5 @@
 [base]
+root_dir = "/dp/"
 data_dir = "/dp/data/"
 hdfs_path = "hdfs://192.168.247.100:9000"
 

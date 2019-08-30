@@ -6,25 +6,26 @@
     </properties>
     <Appenders>
         <Console name="Console" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}–[%t] %-5level -%l - %msg%n" />
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}–[%t] %-5level -%l - %msg%n"/>
         </Console>
-        <RollingRandomAccessFile name="MainFile" fileName="${LOG_ROOT}/${FILE_NAME}.log" filePattern="${LOG_ROOT}/$${date:yyyy-MM}/${FILE_NAME}-%d{yyyy-MM-dd HH}-%i.log">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}–[%t] %-5level -%l - %msg%n" />
+        <RollingRandomAccessFile name="MainFile" fileName="${LOG_ROOT}/${FILE_NAME}.log"
+                                 filePattern="${LOG_ROOT}/$${date:yyyy-MM}/${FILE_NAME}-%d{yyyy-MM-dd HH}-%i.log">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}–[%t] %-5level -%l - %msg%n"/>
             <Policies>
-                <TimeBasedTriggeringPolicy interval="1" />
-                <SizeBasedTriggeringPolicy size="50 MB" />
+                <TimeBasedTriggeringPolicy interval="1"/>
+                <SizeBasedTriggeringPolicy size="50 MB"/>
             </Policies>
-            <DefaultRolloverStrategy max="20" />
+            <DefaultRolloverStrategy max="20"/>
         </RollingRandomAccessFile>
     </Appenders>
 
     <Loggers>
         <Logger name="main" level="debug" additivity="false">
-            <AppenderRef ref="MainFile" />
+            <AppenderRef ref="MainFile"/>
         </Logger>
         <Root level="error">
-            <AppenderRef ref="Console" />
-            <AppenderRef ref="MainFile" />
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="MainFile"/>
         </Root>
     </Loggers>
 </Configuration>

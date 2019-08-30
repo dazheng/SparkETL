@@ -138,7 +138,7 @@ class ETL extends Time {
             configuration = new Configuration();
             fileSystem = FileSystem.get(new URI(HDFS_PATH), configuration);
             fileSystem.copyFromLocalFile(new Path(hdfsDir), new Path(localDir));
-//            Process pro = Runtime.getRuntime().exec(String.format("hadoop fs -get %s/* %s/", hdfsDir, localDir)); // TODO：改成调用接口
+//            Process pro = Runtime.getRuntime().exec(String.format("hadoop fs -get %s/* %s/", hdfsDir, localDir));
 //            pro.waitFor();
         } catch (Exception e) {
             logger.error(e);

@@ -13,9 +13,9 @@ import java.time.LocalDateTime;
 class Dispatch {
     private final Logger logger = LogManager.getLogger();
     private final String master;
-    private SparkSession session;
     private final Integer timeType;
     private final String timeID;
+    private SparkSession session;
     private Integer backDate;
 
     Dispatch(String master, Integer timeType, String timeID, Integer backDate) {

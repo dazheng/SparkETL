@@ -6,26 +6,26 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
-public class Extract extends ETL{
+public class Extract extends ETL {
     private final Logger logger = LogManager.getLogger();
     private final SparkSession session;
     private final DB db;
 
     public Extract(SparkSession session, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) {
-        super(session,timeType, timeID, backDate, frequency);
+        super(session, timeType, timeID, backDate, frequency);
         this.session = session;
         this.db = new DB(dbID);
     }
 
-    public void release(){
+    public void release() {
         this.db.release();
     }
 
-    private void exeViewSql(String table, String sql){
+    private void exeViewSql(String table, String sql) {
         this.db.sqlSpecialView(this.session, table, sql);
     }
 
-    public void exeViewSqls(String sqls){
+    public void exeViewSqls(String sqls) {
         exeSqls(sqls, this::exeViewSql, 2);
     }
 
@@ -35,22 +35,22 @@ public class Extract extends ETL{
         exeSql(insertSql);
     }
 
-    protected void exeExtractSqls(String sqls){
-        exeSqls(sqls, this::exeExtractRdbmsSql,2);
+    protected void exeExtractSqls(String sqls) {
+        exeSqls(sqls, this::exeExtractRdbmsSql, 2);
     }
 
-    private void exeExtractDirSql(String dir, String sql){
-        if (dir!=null) {
+    private void exeExtractDirSql(String dir, String sql) {
+        if (dir != null) {
             logger.info(dir);
         }
-       Dataset<Row> df= db.sqlDF(session,sql);
-        if (dir !=null){
-            toLocalDir(df,dir);
+        Dataset<Row> df = db.sqlDF(session, sql);
+        if (dir != null) {
+            toLocalDir(df, dir);
         }
     }
 
 
-    public void exeExtractDirSqlString(String sqls){
-        exeSqls(sqls, this::exeExtractDirSql,4);
+    public void exeExtractDirSqlString(String sqls) {
+        exeSqls(sqls, this::exeExtractDirSql, 4);
     }
 }

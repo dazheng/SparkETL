@@ -13,13 +13,14 @@ import java.time.LocalDateTime;
 
 public class Func {
 
-    private static Logger logger = LogManager.getLogger();
     private final static String MINUS_SEP = "--------------------------------------------"; // sql间分隔符
     private final static String EQUAL_SEP = "======================================================"; // 开始符号
     private final static String DEFAULT_COL_DELIMITER = "\u0001";
-    private final static String ROOT_DIR = "c:/dp/";
-    private final static String DATA_DIR = ROOT_DIR + "data/";
-    private final static String SQL_FILE_DIR = getProcPath() + "/resource/";
+    private static Logger logger = LogManager.getLogger();
+    //    private final static String ROOT_DIR = "c:/dp/";
+//    private final static String DATA_DIR = ROOT_DIR + "data/";
+    private final static String SQL_FILE_DIR = getProcPath();
+    private static Toml toml = parseParameters();
 
     static String getMinusSep() {
         return MINUS_SEP;
@@ -33,10 +34,6 @@ public class Func {
         return DEFAULT_COL_DELIMITER;
     }
 
-    public static String getRootDir() {
-        return ROOT_DIR;
-    }
-
     public static String trim(String s) {
         return s.trim().replaceAll("[\n|\r|\t|\"|" + DEFAULT_COL_DELIMITER + "]", ""); // TODO:修正正则表达式
     }
@@ -46,19 +43,19 @@ public class Func {
     }
 
     static String getDataDir() {
-        return DATA_DIR;
+        return toml.getTable("base").getString("root_dir");
     }
 
     public static String getExtractSqlDir() {
-        return SQL_FILE_DIR + "extract/";
+        return SQL_FILE_DIR + "/extract/";
     }
 
     public static String getTransformSqlDir() {
-        return SQL_FILE_DIR + "etl/transform/";
+        return SQL_FILE_DIR + "/transform/";
     }
 
     public static String getExportSqlDir() {
-        return SQL_FILE_DIR + "export/";
+        return SQL_FILE_DIR + "/export/";
     }
 
     public static String readSqlFile(String fileName) {
@@ -75,7 +72,7 @@ public class Func {
         return new String(content, StandardCharsets.UTF_8);
     }
 
-    public static String getProcPath() {
+    private static String getProcPath() {
         String filePath = "";
         try {
             File files = new File("");
@@ -87,8 +84,16 @@ public class Func {
         return filePath;
     }
 
-    public static Toml getParameters() {
-        String file = getProcPath() + "/config/conf.toml";
+    private static Toml parseParameters() {
+        String file = getProcPath() + "/conf.toml";
         return new Toml().read(new File(file));
+    }
+
+    static Toml getParameters() {
+        return toml;
+    }
+
+    public String getRootDir() {
+        return toml.getTable("base").getString("root_dir");
     }
 }

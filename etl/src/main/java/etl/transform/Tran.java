@@ -5,7 +5,7 @@ import etl.pub.Transform;
 import org.apache.spark.sql.SparkSession;
 
 public class Tran extends Transform {
-    private String sqlDir = Func.getExtractSqlDir();
+    private String sqlDir = Func.getTransformSqlDir();
 
     public Tran(SparkSession session, Integer timeType, String timeID, Integer backDate, Integer frequency) {
         super(session, timeType, timeID, backDate, frequency);

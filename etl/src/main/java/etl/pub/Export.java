@@ -78,11 +78,11 @@ public class Export extends ETL {
                 this.db.exeSql(sql);
             } else {
                 Dataset<Row> df = exeSql(sql);
-                toLocalDir(df, Func.getDataDir() + "/hive_out/" + table + "/" + getFrequency() + "/");
+                toLocalDir(df, Func.getDataDir() + table + "/" + getFrequency() + "/");
                 this.db.load(table, String.valueOf(getFrequency()));
             }
         } catch (Exception e) {
-            logger.error(e);
+            logger.fatal(e);
         }
     }
 

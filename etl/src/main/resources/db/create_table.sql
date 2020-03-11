@@ -78,23 +78,25 @@ values (15, '2019-11-11', '2018-11-11', current_timestamp, current_timestamp);
 
 
 -- ============================= hive ======================================
-create database test;
+create database stg;
 create database dm;
 
-use test;
+use stg;
+drop table if exists s_holiday;
 create table s_holiday
 (
     id           int,
     create_time  timestamp ,
     update_time  timestamp ,
     holiday_type int      ,
-    begin_date   date     ,
-    end_date     date
-);
+    begin_date   timestamp     ,
+    end_date     timestamp
+)stored as parquet;
 
 use dm;
+drop table if exists m_holiday;
 create table m_holiday
 (holiday_type int,
 cnt int
-);
+)stored as parquet;
 

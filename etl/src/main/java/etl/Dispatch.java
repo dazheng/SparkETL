@@ -7,7 +7,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.spark.sql.SparkSession;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 
 class Dispatch {
@@ -15,7 +14,7 @@ class Dispatch {
     private final String master;
     private final Integer timeType;
     private final String timeID;
-    private SparkSession session;
+    private SparkSession spark;
     private Integer backDate;
 
     Dispatch(String master, Integer timeType, String timeID, Integer backDate) {
@@ -26,47 +25,49 @@ class Dispatch {
     }
 
     private void extractD() {
-        ExtMySQL dp = new ExtMySQL(this.session, this.timeType, this.timeID, this.backDate, "dp", this.timeType);
+        ExtMySQL dp = new ExtMySQL(this.spark, this.timeType, this.timeID, this.backDate, "dp", this.timeType);
         dp.dpFull();
         dp.release();
     }
 
     private void transformD() {
-        Tran t = new Tran(this.session, this.timeType, this.timeID, this.backDate, this.timeType);
+        Tran t = new Tran(this.spark, this.timeType, this.timeID, this.backDate, this.timeType);
         t.s2iD();
         t.release();
     }
 
     private void exportD() {
-        ExpMySQL dp = new ExpMySQL(this.session, this.timeType, this.timeID, this.backDate, "dp", this.timeType);
+        ExpMySQL dp = new ExpMySQL(this.spark, this.timeType, this.timeID, this.backDate, "dp", this.timeType);
         dp.dpD();
         dp.release();
     }
 
-    private void setSession(String appName) {
-        this.session = SparkSession.builder().master(this.master).appName(appName).enableHiveSupport().getOrCreate();
+    private void setSpark(String appName) {
+        this.spark = SparkSession.builder().appName(appName).enableHiveSupport().getOrCreate();
+        // this.session = SparkSession.builder().master(this.master).appName(appName).enableHiveSupport().getOrCreate();
     }
 
     void prod() {
         String appName = "";
         LocalDateTime start = LocalDateTime.now();
-        try {
+//        try {
             switch (this.timeType) {
                 case 1:
-                    setSession("etl_day");
-                    this.backDate = 15;
-                    extractD();
-                    transformD();
+                    setSpark("etl_day");
+                    this.backDate = 7;
+//                    extractD();
+//                    transformD();
                     exportD();
+                    break;
                 case 11:
-                    setSession("etl_1hour");
+                    setSpark("etl_1hour");
+                    break;
             }
-        } catch (Exception e) {
-            logger.error(e);
-        } finally {
-            this.session.stop();
-            logger.warn("%s time taken: %d s", appName, Duration.between(LocalDateTime.now(), start).getSeconds());
-        }
+//        } catch (Exception e) {
+//            logger.fatal(e);
+//        } finally {
+//            this.session.stop();
+//            logger.warn("%s time taken: %d s", appName, Duration.between(LocalDateTime.now(), start).getSeconds());
+//        }
     }
 }
-

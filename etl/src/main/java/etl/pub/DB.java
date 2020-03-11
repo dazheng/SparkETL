@@ -3,7 +3,6 @@ package etl.pub;
 import com.moandjiezana.toml.Toml;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.spark.sql.DataFrameReader;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -155,11 +154,11 @@ public class DB {
         Connection conn = null;
         try {
             conn = DriverManager.getConnection(this.jdbcUrl, this.user, this.password);
-            conn.setAutoCommit(false);
+            conn.setAutoCommit(true);
             return conn;
         } catch (SQLException e) {
             e.printStackTrace();
-            this.logger.error(e);
+            this.logger.fatal(e);
         }
         /*
          * Connection是Statement的工厂，一个Connection可以生产多个Statement。
@@ -170,9 +169,9 @@ public class DB {
         return null;
     }
 
-    private DataFrameReader jdbcReader(@NotNull SparkSession session, String sql) {
-        return session.read().format("jdbc").option("url", this.jdbcUrl).option("dbtable", sql)
-            .option("user", this.user).option("password", this.password);
+    private Dataset<Row> jdbcReader(@NotNull SparkSession spark, String sql) {
+        return spark.read().format("jdbc").option("url", this.jdbcUrl).option("query", sql)
+            .option("user", this.user).option("password", this.password).load();
     }
 
     void dfTable(@NotNull Dataset<Row> df, String table) {
@@ -184,9 +183,9 @@ public class DB {
 
     Dataset<Row> sqlDF(SparkSession session, String sql) {
         LocalDateTime start = LocalDateTime.now();
-        sql = parseDBTable(sql);
+//        sql = parseDBTable(sql);
         logger.info(sql);
-        Dataset<Row> df = jdbcReader(session, sql).load();
+        Dataset<Row> df = jdbcReader(session, sql);
         Func.printDuration(start, LocalDateTime.now());
         return df;
     }
@@ -206,10 +205,13 @@ public class DB {
         PreparedStatement stmt = null;
         LocalDateTime start = LocalDateTime.now();
         try {
+            System.out.println(sql);
+            this.logger.info(Func.getMinusSep());
+            this.logger.info(sql);
             stmt = getConnection().prepareStatement(sql);
             stmt.executeUpdate(sql);
         } catch (SQLException e) {
-            this.logger.error(e);
+            this.logger.fatal(e);
         } finally {
             close(stmt);
         }
@@ -239,7 +241,7 @@ public class DB {
                 s = s.substring(0, s.length() - 1);
             }
         } catch (SQLException e) {
-            this.logger.error(e);
+            this.logger.fatal(e);
         } finally {
             close(rs);
             close(stmt);
@@ -248,18 +250,17 @@ public class DB {
     }
 
     void load(String table, String timeType) {
-        String dir = Func.getDataDir() + table + '/' + timeType + '/';
-        // List<Path> files = Files.list(Paths.get(dir)).filter(Files::isRegularFile);
+        String dir = Func.getDataDir() + table + "/" + timeType + "/";
         try {
-            Files.newDirectoryStream(Paths.get("."), path -> path.toFile().isFile() && !path.toFile().isHidden())
+            Files.newDirectoryStream(Paths.get(dir), path -> path.toFile().isFile() && !path.toFile().isHidden() && path.toFile().length() > 0)
                 .forEach(f -> {
                     String sql = String.format(
-                        "load data local infile '%s' replace into table %s Fields Terminated By '\\x01' Lines Terminated By '\\n' ",
-                        dir + f, table); // TODO:
+                        "load data local infile '%s' replace into table %s Fields Terminated By '%s' Lines Terminated By '\\n' ",
+                        f, table, Func.getDefaultColDelimiter());
                     exeSql(sql);
                 });
         } catch (IOException e) {
-            logger.error(e);
+            logger.fatal(e);
         }
     }
 }

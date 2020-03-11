@@ -15,7 +15,7 @@ public class Time {
     private final String timeID;
     private final Integer backDate;
     private final Integer frequency;
-    private Map<String, String> timeParas = new HashMap<String, String>(); // TOOD
+    private Map<String, String> timeParas = new HashMap<String, String>(); // TODO:
 
     private DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -58,7 +58,7 @@ public class Time {
         String timeType = String.valueOf(this.timeType);
         String timeID = this.timeID;
 
-        switch (this.timeType) { // time_type: 1 日； 2 周；3 月； 4 年；11 小时； 12 半小时； 13；10分钟； 14 5分钟； 15 1分钟
+        switch (this.timeType) { // time_type: 1 日； 2 周；3 月； 4 年；11 小时； 12 半小时； 13 10分钟； 14 5分钟； 15 1分钟
             case 1:
                 LocalDate date = LocalDate.parse(this.timeID, this.dateFormatter);
                 startTimeID = date.plusDays(-(this.backDate - 1)).format(this.dateFormatter);
@@ -66,6 +66,7 @@ public class Time {
                 endDateTime = this.timeID + " 23:59:59";
                 startDateID = startTimeID;
                 endDateID = this.timeID;
+                break;
             case 11:
                 LocalDate dateTime = LocalDate.parse(this.timeID, this.dateTimeFormatter);
                 startDateTime = timeID;
@@ -74,6 +75,7 @@ public class Time {
                 timeID = dateTime.format(dateFormatter);
                 startDateTime = timeID + " 00:00:00";
                 endDateTime = timeID + " 23:59:59";
+                break;
         }
         Map<String, String> map = new HashMap<>();
         map.put("v_time_type", timeType);
@@ -95,7 +97,7 @@ public class Time {
             case 3:
                 return LocalDate.parse(this.timeID, this.monthFormatter).plusMonths(1).format(this.dateFormatter);
             default:
-                this.logger.error("not support time_type=%s", this.timeType);
+                this.logger.fatal("not support time_type=%s", this.timeType);
                 return timeID;
         }
     }
@@ -109,10 +111,13 @@ public class Time {
         switch (this.timeType) {
             case 1:
                 start = getTimeParameter("v_start_time_id");
+                break;
             case 2:
                 start = getTimeParameter("v_time_id");
+                break;
             case 3:
                 start = getTimeParameter("v_time_id");
+                break;
         }
         return start;
     }
@@ -122,10 +127,13 @@ public class Time {
         switch (this.timeType) {
             case 1:
                 end = getTimeParameter("v_end_time_id");
+                break;
             case 2:
                 end = getTimeParameter("v_time_id");
+                break;
             case 3:
                 end = getTimeParameter("v_time_id");
+                break;
         }
         return end;
     }

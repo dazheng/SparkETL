@@ -1,12 +1,11 @@
 [base]
 root_dir = "/dp/"
-data_dir = "/dp/data/"
-hdfs_path = "hdfs://192.168.247.100:9000"
+data_dir = "/dp/data/hive_exchange/"
+hdfs_path = "hdfs://master"
 
 [[db]]
 id = "dp"
-driver_class = "com.mysql.cj.jdbc.Driver"
-url = "jdbc:mysql://localhost:3306/test"
-user = "test"
-password = "test"
-
+driver_class = "com.mysql.jdbc.Driver"
+url = "jdbc:mysql://127.0.0.1:3306/test?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8"
+user = "hadoop"
+password = "hadoop"

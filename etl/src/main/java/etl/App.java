@@ -1,38 +1,40 @@
 package etl;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import etl.pub.Func;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-/**
- * Hello world!
- */
+
 public final class App {
-    private static void job(String jobName, String master, Integer timeType, String timeID, Integer backDate) {
-        Dispatch disp = new Dispatch(master, timeType, timeID, backDate);
+    private static void job(String jobName, Integer timeType, String timeID, Integer backDate) {
+        Dispatch disp = new Dispatch(timeType, timeID, backDate);
         switch (jobName) {
             case "prod":
                 disp.prod();
+                break;
+            default:
                 break;
         }
     }
 
     public static void main(String[] args) {
-        Logger logger = LogManager.getLogger();
-        logger.debug("start");
-//        final String MASTER = "spark://192.168.1.39:7077";
-        final String MASTER = "yarn";
+        final Logger logger = LoggerFactory.getLogger(App.class);
+        LocalDateTime start = LocalDateTime.now();
+        logger.info(Func.getEqualSep());
+        logger.info("start");
         Integer backDate = 7;
         String jobName = "prod";
         int timeType = 1;
         String timeID = LocalDate.now().plusDays(-1).toString();
-        logger.debug("========================================================================");
+
         if (args.length == 4) {
             jobName = args[1].toLowerCase();
             timeType = Integer.parseInt(args[2]);
             timeID = args[3];
         }
-        job(jobName, MASTER, timeType, timeID, backDate);
+        job(jobName, timeType, timeID, backDate);
     }
 }

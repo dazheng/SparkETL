@@ -3,22 +3,21 @@ package etl;
 import etl.export.ExpMySQL;
 import etl.extract.ExtMySQL;
 import etl.transform.Tran;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 class Dispatch {
-    private final Logger logger = LogManager.getLogger();
-    private final String master;
+    private static final Logger logger = LoggerFactory.getLogger(Dispatch.class);
     private final Integer timeType;
     private final String timeID;
     private SparkSession spark;
     private Integer backDate;
 
-    Dispatch(String master, Integer timeType, String timeID, Integer backDate) {
-        this.master = master;
+    Dispatch(Integer timeType, String timeID, Integer backDate) {
         this.timeType = timeType;
         this.timeID = timeID;
         this.backDate = backDate;
@@ -44,30 +43,31 @@ class Dispatch {
 
     private void setSpark(String appName) {
         this.spark = SparkSession.builder().appName(appName).enableHiveSupport().getOrCreate();
-        // this.session = SparkSession.builder().master(this.master).appName(appName).enableHiveSupport().getOrCreate();
     }
 
-    void prod() {
+    public void prod() {
         String appName = "";
         LocalDateTime start = LocalDateTime.now();
-//        try {
+        try {
             switch (this.timeType) {
                 case 1:
-                    setSpark("etl_day");
+                    appName = "etl_day";
+                    setSpark(appName);
                     this.backDate = 7;
-//                    extractD();
-//                    transformD();
+                    extractD();
+                    transformD();
                     exportD();
                     break;
                 case 11:
-                    setSpark("etl_1hour");
+                    appName = "etl_1hour";
+                    setSpark(appName);
                     break;
             }
-//        } catch (Exception e) {
-//            logger.fatal(e);
-//        } finally {
-//            this.session.stop();
-//            logger.warn("%s time taken: %d s", appName, Duration.between(LocalDateTime.now(), start).getSeconds());
-//        }
+        } catch (Exception e) {
+            logger.error(e.toString(), e);
+        } finally {
+            this.spark.stop();
+            logger.info("{} time taken {} s", appName, Duration.between(start, LocalDateTime.now()).getSeconds());
+        }
     }
 }

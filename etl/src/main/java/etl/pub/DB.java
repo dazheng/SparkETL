@@ -1,12 +1,12 @@
 package etl.pub;
 
 import com.moandjiezana.toml.Toml;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,7 +17,7 @@ import java.util.List;
 
 
 public class DB {
-    private final Logger logger = LogManager.getLogger();
+    private final Logger logger = LoggerFactory.getLogger(DB.class);
     private String id;
     private String driverClass;
     private String jdbcUrl;
@@ -41,13 +41,13 @@ public class DB {
      *
      * @param conn
      */
-    private static void close(Connection conn) {
+    private void close(Connection conn) {
         try {
             if (conn != null) {
                 conn.close();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            this.logger.error(e.toString(), e);
         }
     }
 
@@ -56,13 +56,13 @@ public class DB {
      *
      * @param stmt
      */
-    private static void close(Statement stmt) {
+    private void close(Statement stmt) {
         try {
             if (stmt != null) {
                 stmt.close();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            this.logger.error(e.toString(), e);
         }
     }
 
@@ -71,54 +71,16 @@ public class DB {
      *
      * @param rs
      */
-    private static void close(ResultSet rs) {
+    private void close(ResultSet rs) {
         try {
             if (rs != null) {
                 rs.close();
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            this.logger.error(e.toString(), e);
         }
     }
 
-    /**
-     * 提交事务
-     *
-     * @param conn
-     */
-    public static void commit(Connection conn) {
-        try {
-            if (conn != null) {
-                conn.commit();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * 回滚事务
-     *
-     * @param conn
-     */
-    public static void rollback(Connection conn) {
-        try {
-            if (conn != null) {
-                conn.rollback();
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @NotNull
-    private static String parseDBTable(String s) {
-        s = s.trim();
-        if (s.substring(0, 7).equals("select ")) {
-            s = "(" + s + ") t";
-        }
-        return s;
-    }
 
     void release() {
         close(this.conn);
@@ -146,8 +108,7 @@ public class DB {
         try {
             Class.forName(this.driverClass);
         } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-
+            this.logger.error(e.toString(), e);
         }
 
         // 2.创建Connection(数据库连接对象)
@@ -157,51 +118,12 @@ public class DB {
             conn.setAutoCommit(true);
             return conn;
         } catch (SQLException e) {
-            e.printStackTrace();
-            this.logger.fatal(e);
+            this.logger.error(e.toString(), e);
         }
-        /*
-         * Connection是Statement的工厂，一个Connection可以生产多个Statement。
-         * Statement是ResultSet的工厂，一个Statement却只能对应一个ResultSet（它们是一一对应的关系）。
-         * 所以在一段程序里要用多个ResultSet的时候，必须再Connection中获得多个Statement，
-         * 然后一个Statement对应一个ResultSet。
-         */
         return null;
     }
 
-    private Dataset<Row> jdbcReader(@NotNull SparkSession spark, String sql) {
-        return spark.read().format("jdbc").option("url", this.jdbcUrl).option("query", sql)
-            .option("user", this.user).option("password", this.password).load();
-    }
-
-    void dfTable(@NotNull Dataset<Row> df, String table) {
-        LocalDateTime start = LocalDateTime.now();
-        df.write().mode("append").format("jdbc").option("url", this.jdbcUrl).option("dbtable", table)
-            .option("user", this.user).option("password", this.password).save();
-        Func.printDuration(start, LocalDateTime.now());
-    }
-
-    Dataset<Row> sqlDF(SparkSession session, String sql) {
-        LocalDateTime start = LocalDateTime.now();
-//        sql = parseDBTable(sql);
-        logger.info(sql);
-        Dataset<Row> df = jdbcReader(session, sql);
-        Func.printDuration(start, LocalDateTime.now());
-        return df;
-    }
-
-
-    void sqlView(SparkSession session, String sql) {
-        Dataset<Row> df = sqlDF(session, sql);
-        df.createOrReplaceTempView("v_tmp");
-    }
-
-    void sqlSpecialView(SparkSession session, String table, String sql) {
-        Dataset<Row> df = sqlDF(session, sql);
-        df.createOrReplaceTempView("v_" + table);
-    }
-
-    void exeSql(String sql) {
+    void exeSQL(String sql) {
         PreparedStatement stmt = null;
         LocalDateTime start = LocalDateTime.now();
         try {
@@ -211,11 +133,11 @@ public class DB {
             stmt = getConnection().prepareStatement(sql);
             stmt.executeUpdate(sql);
         } catch (SQLException e) {
-            this.logger.fatal(e);
+            this.logger.error(e.toString());
         } finally {
             close(stmt);
+            Func.printDuration(start, LocalDateTime.now());
         }
-        Func.printDuration(start, LocalDateTime.now());
     }
 
     String getMysqlColumn(String table) {
@@ -241,7 +163,7 @@ public class DB {
                 s = s.substring(0, s.length() - 1);
             }
         } catch (SQLException e) {
-            this.logger.fatal(e);
+            this.logger.error(e.toString(), e);
         } finally {
             close(rs);
             close(stmt);
@@ -256,11 +178,41 @@ public class DB {
                 .forEach(f -> {
                     String sql = String.format(
                         "load data local infile '%s' replace into table %s Fields Terminated By '%s' Lines Terminated By '\\n' ",
-                        f, table, Func.getDefaultColDelimiter());
-                    exeSql(sql);
+                        f, table, Func.getColumnDelimiter());
+                    exeSQL(sql);
                 });
         } catch (IOException e) {
-            logger.fatal(e);
+            logger.error(e.toString(), e);
         }
+    }
+
+    private Dataset<Row> jdbcLoad(@NotNull SparkSession spark, String sql) {
+        return spark.read().format("jdbc").option("url", this.jdbcUrl).option("query", sql)
+            .option("user", this.user).option("password", this.password).load();
+    }
+
+    void jdbcSave(@NotNull Dataset<Row> df, String table) {
+        LocalDateTime start = LocalDateTime.now();
+        df.write().mode("append").format("jdbc").option("url", this.jdbcUrl).option("dbtable", table)
+            .option("user", this.user).option("password", this.password).save();
+        Func.printDuration(start, LocalDateTime.now());
+    }
+
+    Dataset<Row> sqlDF(SparkSession spark, String sql) {
+        LocalDateTime start = LocalDateTime.now();
+        logger.info(sql);
+        Dataset<Row> df = jdbcLoad(spark, sql);
+        Func.printDuration(start, LocalDateTime.now());
+        return df;
+    }
+
+    void sqlView(SparkSession spark, String sql) {
+        Dataset<Row> df = sqlDF(spark, sql);
+        df.createOrReplaceTempView("v_tmp");
+    }
+
+    void sqlSpecialView(SparkSession spark, String table, String sql) {
+        Dataset<Row> df = sqlDF(spark, sql);
+        df.createOrReplaceTempView("v_" + table);
     }
 }

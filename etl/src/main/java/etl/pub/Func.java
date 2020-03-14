@@ -1,8 +1,9 @@
 package etl.pub;
 
 import com.moandjiezana.toml.Toml;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import etl.App;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -10,17 +11,19 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.Properties;
 
 public class Func {
+    private static Logger logger = LoggerFactory.getLogger(Func.class);
     private final static String MINUS_SEP = "--------------------------------------------"; // sql间分隔符
     private final static String EQUAL_SEP = "======================================================"; // 开始符号
-    //    private final static String DEFAULT_COL_DELIMITER = "\u0001";
-    private final static String DEFAULT_COL_DELIMITER = ",";
-    private static Logger logger = LogManager.getLogger();
+    //    private final static String DEFAULT_COL_DELIMITER = "\u0001"; // 数据文件列分隔符
+    private final static String DEFAULT_COL_DELIMITER = ",";  // 数据文件列分隔符
     static final Properties PROPERTIES = new Properties(System.getProperties());
-    private final static String LineDelimiter = PROPERTIES.getProperty("line.separator");
-    private final static String pathDelimiter = PROPERTIES.getProperty("path.separator");
+    private final static String LineDelimiter = PROPERTIES.getProperty("line.separator"); // 操作系统换行符
+    private final static String pathDelimiter = PROPERTIES.getProperty("path.separator"); // 操作系统路径分隔符
+
     private static Toml toml = parseParameters();
 
     static String getMinusSep() {
@@ -31,15 +34,15 @@ public class Func {
         return EQUAL_SEP;
     }
 
-    public static String getDefaultColDelimiter() {
+    public static String getColumnDelimiter() {
         return DEFAULT_COL_DELIMITER;
     }
 
-    public static String getLineDelimiter() {
+    public static String getOSLineDelimiter() {
         return LineDelimiter;
     }
 
-    public static String getPathDelimiter() {
+    public static String getOSPathDelimiter() {
         return pathDelimiter;
     }
 
@@ -48,65 +51,38 @@ public class Func {
     }
 
     static void printDuration(LocalDateTime start, LocalDateTime end) {
-        logger.info("time taken %d s", Duration.between(end, start).getSeconds());
+        logger.info("time taken {} s", Duration.between(start, end).getSeconds());
     }
 
     public static String getDataDir() {
         return toml.getTable("base").getString("data_dir");
     }
 
-    public static String getExtractSqlDir() {
-        return "extract/";
-    }
-
-    public static String getTransformSqlDir() {
-        return "transform/";
-    }
-
-    public static String getExportSqlDir() {
-        return "export/";
-    }
-
-//    public static String readSqlFile(String fileName) {
-//        File file = new File(fileName);
-//        long length = file.length();
-//        byte[] content = new byte[(int) length];
-//        try {
-//            FileInputStream in = new FileInputStream(file);
-//            in.read(content);
-//            in.close();
-//        } catch (IOException e) {
-//            logger.fatal(e);
-//        }
-//        return new String(content, StandardCharsets.UTF_8);
-//    }
-
     public static String readSqlFile(String fileName) {
         StringBuilder sb = null;
         try (
             BufferedReader in =
-                new BufferedReader(new InputStreamReader(etl.App.class.getClassLoader().getResourceAsStream(fileName)));) {
+                new BufferedReader(new InputStreamReader(Objects.requireNonNull(App.class.getClassLoader().getResourceAsStream(fileName))));) {
             sb = new StringBuilder();
             String line;
             while ((line = in.readLine()) != null) {
                 line = line.trim();
                 if (line.length() > 0) {
                     sb.append(line);
-                    sb.append(getLineDelimiter());
+                    sb.append(getOSLineDelimiter());
                 }
             }
         } catch (IOException e) {
-            logger.fatal(e);
+            logger.error(e.toString(), e);
         }
+        assert sb != null;
         return sb.toString();
     }
 
     private static Toml parseParameters() {
         InputStreamReader in =
-            new InputStreamReader(etl.App.class.getClassLoader().getResourceAsStream("conf.toml"));
+            new InputStreamReader(Objects.requireNonNull(App.class.getClassLoader().getResourceAsStream("conf.toml")));
         return new Toml().read(in);
-//        String file = getProcPath() + "/conf.toml";
-//        return new Toml().read(new File(file));
     }
 
     static Toml getParameters() {
@@ -117,15 +93,15 @@ public class Func {
         return toml.getTable("base").getString("root_dir");
     }
 
-    public static boolean delDir(File dir) {
+    public static boolean deleteDir(File dir) {
         if (dir.isDirectory()) {
             String[] children = dir.list();
-            for (int i = 0; i < children.length; i++) {
-                boolean success = delDir(new File(dir, children[i]));
+            assert children != null;
+            for (String child : children) {
+                boolean success = deleteDir(new File(dir, child));
                 if (!success)
                     return false;
             }
-
         }
         if (dir.delete()) {
             return true;
@@ -134,5 +110,4 @@ public class Func {
         }
         return false;
     }
-
 }

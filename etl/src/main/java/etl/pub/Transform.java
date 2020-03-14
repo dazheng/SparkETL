@@ -1,18 +1,26 @@
 package etl.pub;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public class Transform extends ETL {
-    private final Logger logger = LogManager.getLogger();
+    private final Logger logger = LoggerFactory.getLogger(Transform.class);
 
-    public Transform(SparkSession session, Integer timeType, String timeID, Integer backDate, Integer frequency) {
-        super(session, timeType, timeID, backDate, frequency);
+    public Transform(SparkSession spark, Integer timeType, String timeID, Integer backDate, Integer frequency) {
+        super(spark, timeType, timeID, backDate, frequency);
+    }
+
+    public static String getTransformSqlDir() {
+        return "transform/";
+    }
+
+    public void release() {
+
     }
 
     public void dropHivePartition(List<String> tables) {
@@ -21,32 +29,29 @@ public class Transform extends ETL {
             String end = getEndTimeID();
             while (start.compareTo(end) <= 0) {
                 String sql = String.format("alter table %s drop if exists partition(time_type=%s, time_id='%s')", t, getTimeType(), start);
-                exeSql(sql);
+                exeSQL(sql);
                 start = getNextTimeID(start);
             }
         }
     }
 
-    private void exeDirSql(String dir, String sql) {
-        if (dir != null) {
+    private void exeSQL(String dir, String sql) {
+        if (dir != null && !dir.isEmpty()) {
             logger.info(dir);
         }
-        Dataset<Row> df = exeSql(sql);
-        if (dir != null) {
+        Dataset<Row> df = exeSQL(sql);
+        if (dir != null && !dir.isEmpty()) {
             toLocalDir(df, dir);
         }
-
     }
 
-    protected void exeSqls(String sqls) {
-        exeSqls(sqls, this::exeDirSql, 1);
-    }
-
-    public void exeViewSqls(String sqls) {
-        exeSqls(sqls, this::sqlSpecialView, 2);
-    }
-
-    public void release() {
-
+    protected void exeSQLFile(String fileName, String exeType) {
+        String sqls = Func.readSqlFile(getTransformSqlDir() + fileName);
+        exeType = exeType.toLowerCase();
+        if (exeType.equals("insert")) {
+            exeSQLs(sqls, this::exeSQL, 1);
+        } else if (exeType.equals("view")) {
+            exeSQLs(sqls, this::sqlSpecialView, 2);
+        }
     }
 }

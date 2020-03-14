@@ -1,7 +1,7 @@
 package etl.pub;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -10,12 +10,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Time {
-    private final Logger logger = LogManager.getLogger();
+    private final Logger logger = LoggerFactory.getLogger(Time.class);
     private final Integer timeType;
     private final String timeID;
     private final Integer backDate;
     private final Integer frequency;
-    private Map<String, String> timeParas = new HashMap<String, String>(); // TODO:
+    private Map<String, String> timeParas = new HashMap<String, String>();
 
     private DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private DateTimeFormatter monthFormatter = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -41,11 +41,11 @@ public class Time {
         return backDate;
     }
 
-    Integer getFrequency() {
+    protected Integer getFrequency() {
         return frequency;
     }
 
-    Map<String, String> getTimeParameters() {
+    protected Map<String, String> getTimeParameters() {
         return timeParas;
     }
 
@@ -88,7 +88,7 @@ public class Time {
         return map;
     }
 
-    String getNextTimeID(String timeID) {
+    protected String getNextTimeID(String timeID) {
         switch (this.timeType) {
             case 1:
                 return LocalDate.parse(this.timeID, this.dateTimeFormatter).plusDays(1).format(this.dateFormatter);
@@ -97,7 +97,7 @@ public class Time {
             case 3:
                 return LocalDate.parse(this.timeID, this.monthFormatter).plusMonths(1).format(this.dateFormatter);
             default:
-                this.logger.fatal("not support time_type=%s", this.timeType);
+                this.logger.error("not support time_type={}", this.timeType);
                 return timeID;
         }
     }
@@ -106,7 +106,7 @@ public class Time {
         return this.timeParas.get(varTime);
     }
 
-    String getStartTimeID() {
+    protected String getStartTimeID() {
         String start = "";
         switch (this.timeType) {
             case 1:
@@ -122,7 +122,7 @@ public class Time {
         return start;
     }
 
-    String getEndTimeID() {
+    protected String getEndTimeID() {
         String end = "";
         switch (this.timeType) {
             case 1:

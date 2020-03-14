@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<Configuration status="WARN" monitorInterval="300">
+<!--
+    status : 这个用于设置log4j2自身内部的信息输出,可以不设置,当设置成trace时,会看到log4j2内部各种详细输出
+    monitorInterval : Log4j能够自动检测修改配置文件和重新配置本身, 设置间隔秒数。
+
+    注：本配置文件的目标是将不同级别的日志输出到不同文件，最大2MB一个文件，
+    文件数据达到最大值时，旧数据会被压缩并放进指定文件夹
+-->
+<Configuration status="WARN" monitorInterval="600">
     <properties>
         <property name="LOG_ROOT">/dp/log</property>
         <property name="FILE_NAME">etl</property>
@@ -12,7 +19,7 @@
                                  filePattern="${LOG_ROOT}/$${date:yyyy-MM}/${FILE_NAME}-%d{yyyy-MM-dd HH}-%i.log">
             <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS}–[%t] %-5level -%l - %msg%n"/>
             <Policies>
-                <TimeBasedTriggeringPolicy interval="1"/>
+                <TimeBasedTriggeringPolicy interval="1"/> <!-- 如果filePattern配置的日期格式为 %d{yyyy-MM-dd} ，则天生成一个压缩文件 -->
                 <SizeBasedTriggeringPolicy size="50 MB"/>
             </Policies>
             <DefaultRolloverStrategy max="20"/>
@@ -20,12 +27,12 @@
     </Appenders>
 
     <Loggers>
-        <Logger name="main" level="debug" additivity="false">
+<!--        <Logger level="debug" additivity="false">-->
+<!--            <AppenderRef ref="MainFile"/>-->
+<!--        </Logger>-->
+        <Root level="info">
             <AppenderRef ref="MainFile"/>
-        </Logger>
-        <Root level="error">
             <AppenderRef ref="Console"/>
-            <AppenderRef ref="MainFile"/>
         </Root>
     </Loggers>
 </Configuration>

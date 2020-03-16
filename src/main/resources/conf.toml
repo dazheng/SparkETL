@@ -1,0 +1,44 @@
+[base]
+log_dir = "/dp/log/"    # 日志文件根路径
+data_dir = "/dp/data/hive_exchange/"    # 数据文件根路径
+conf_dir = "/dp/conf"   # 配置文件根路径
+
+hdfs_path = "hdfs://master" # hdfs
+
+[[rdb]]
+id = "dp"
+driver_class = "com.mysql.jdbc.Driver"
+url = "jdbc:mysql://127.0.0.1:3306/test?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8"
+user = "hadoop"
+password = "hadoop"
+
+
+[[db]]
+id = "order_mysql"
+db_type = "mysql"
+driver_class = "oracle.jdbc.driver.OracleDriver"
+url = "jdbc:oracle:thin:@127.0.0.1:1521:orcl"
+user = "hadoop"
+password = "hadoop"
+
+[[db]]
+id = "order_oracle"
+db_type = "oracle"
+driver_class = "oracle.jdbc.driver.OracleDriver"
+url = "jdbc:oracle:thin:@127.0.0.1:1521:test"
+user = "hadoop"
+password = "hadoop"
+
+[[db]]
+id = "order_sqlserver"
+driver_class = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+url = "jdbc:sqlserver://localhost:1433;DatabaseName=test"
+user = "hadoop"
+password = "hadoop"
+
+
+[[db]]
+id = "log_mongo"
+db_type = "mongodb"
+url = "mongodb://hadoop:hadoop@127.0.0.1:3717/test"
+

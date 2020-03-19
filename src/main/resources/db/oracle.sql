@@ -1,6 +1,6 @@
 create or replace procedure sql_to_csv(p_query in varchar2, -- plsql文
                                        p_dir in varchar2, -- 导出的文件放置目录
-                                       p_filename in varchar2 -- csv名
+                                       p_filename in varchar2 -- 文件名
 )
     is
     l_output       utl_file.file_type;

@@ -32,6 +32,7 @@ class Dispatch {
     private void transformD() {
         Tran t = new Tran(this.spark, this.timeType, this.timeID, this.backDate, this.timeType);
         t.s2iD();
+        t.i2mD();
         t.release();
     }
 
@@ -53,7 +54,7 @@ class Dispatch {
                 case 1:
                     appName = "etl_day";
                     setSpark(appName);
-                    this.backDate = 7;
+                    this.backDate = 1;
                     extractD();
                     transformD();
                     exportD();

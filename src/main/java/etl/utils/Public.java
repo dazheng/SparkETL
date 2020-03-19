@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -17,8 +19,8 @@ public class Public {
     private static Logger logger = LoggerFactory.getLogger(Public.class);
     private final static String MINUS_SEP = "--------------------------------------------"; // sql间分隔符
     private final static String EQUAL_SEP = "======================================================"; // 开始符号
-    //    private final static String DEFAULT_COL_DELIMITER = "\u0001"; // 数据文件列分隔符
-    private final static String DEFAULT_COL_DELIMITER = ",";  // 数据文件列分隔符
+    private final static String DEFAULT_COL_DELIMITER = "\u0001"; // 数据文件列分隔符
+    //    private final static String DEFAULT_COL_DELIMITER = ",";  // 数据文件列分隔符
     static final Properties PROPERTIES = new Properties(System.getProperties());
     private final static String LineDelimiter = PROPERTIES.getProperty("line.separator"); // 操作系统换行符
     private final static String pathDelimiter = PROPERTIES.getProperty("path.separator"); // 操作系统路径分隔符
@@ -37,12 +39,19 @@ public class Public {
         return DEFAULT_COL_DELIMITER;
     }
 
+    public static String getColumnDelimiterRDB() {
+        if(getColumnDelimiter().equals("\u0001")) {
+            return "x'01'";
+        }
+        return getColumnDelimiter();
+    }
     public static String getOSLineDelimiter() {
         return LineDelimiter;
     }
 
     public static String getOSPathDelimiter() {
-        return pathDelimiter;
+//        return pathDelimiter;
+        return "/";
     }
 
     public static String trim(String s) {
@@ -65,6 +74,11 @@ public class Public {
         return toml.getTable("base").getString("conf_dir");
     }
 
+    public static String getTableDataDirectory(String table, String timeType) {
+        return getDataDirectory() + table + "/" + timeType + "/";
+    }
+
+    // TODO: 一次读取整个文件
     public static String readSqlFile(String fileName) {
         StringBuilder sb = null;
         try (
@@ -73,7 +87,7 @@ public class Public {
             sb = new StringBuilder();
             String line;
             while ((line = in.readLine()) != null) {
-                line = line.trim();
+                line = line.trim().replace("\r\n", getOSLineDelimiter());
                 if (line.length() > 0) {
                     sb.append(line);
                     sb.append(getOSLineDelimiter());
@@ -96,9 +110,6 @@ public class Public {
         return toml;
     }
 
-    public String getRootDir() {
-        return toml.getTable("base").getString("root_dir");
-    }
 
     public static boolean deleteDirectory(File dir) {
         if (dir.isDirectory()) {

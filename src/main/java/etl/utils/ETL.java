@@ -105,7 +105,7 @@ public class ETL extends Time {
     }
 
     void exeSQLs(String sqlString, BiConsumer<String, String> func, Integer type) {
-        if (sqlString == null || func == null || sqlString.trim().isEmpty() ) {
+        if (sqlString == null || func == null || sqlString.trim().isEmpty()) {
             return;
         }
         String[] s = sqlString.split(";");
@@ -125,6 +125,8 @@ public class ETL extends Time {
         }
     }
 
+
+    //    是否需要返回
     Dataset<Row> exeSQL(String sql) {
         LocalDateTime start = LocalDateTime.now();
         logger.info(Public.getMinusSep());
@@ -157,7 +159,7 @@ public class ETL extends Time {
             try {
                 fileSystem.close();
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.error(e.toString(), e);
             }
         }
     }
@@ -165,5 +167,15 @@ public class ETL extends Time {
     void sqlToSpecialView(String table, String sql) {
         Dataset<Row> df = exeSQL(sql);
         df.createOrReplaceTempView("v_" + table);
+    }
+
+    protected void hiveLoad(String insertSQL, String file) {
+        String sql = String.format("load data local inpath '%s' %s ", file, getHiveLoad(insertSQL));
+        exeSQL(sql);
+    }
+
+    private String getHiveLoad(String insertSQL) {
+        return insertSQL.replace("insert overwrite", "overwrite into")
+            .replace("insert into", "into");
     }
 }

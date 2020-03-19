@@ -1,102 +1,202 @@
--- ========================== mysql ============================================
-drop table if exists holiday;
--- auto-generated definition
-create table holiday
+-- mysql --
+create table if not exists user
 (
-    id           int auto_increment
-        primary key,
-    create_time  datetime not null comment '创建时间',
-    update_time  datetime not null comment '更新时间',
-    holiday_type int      not null comment '假期类型',
-    begin_date   date     not null comment '开始日期',
-    end_date     date     not null comment '结束日期'
-
-);
-
-create
-    unique index idx_holiday
-    on holiday (holiday_type, begin_date);
-
-create table m_holiday
-(holiday_type int,
-cnt int
-);
-
-
-delete
-from holiday;
-delete
-from holiday;
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (1, '2016-12-31', '2017-01-02', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (2, '2017-01-27', '2017-02-02', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (3, '2017-04-02', '2017-04-04', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (4, '2017-04-29', '2017-05-01', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (5, '2017-05-28', '2017-05-30', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (7, '2017-10-01', '2017-10-08', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (15, '2017-11-11', '2017-11-11', current_timestamp, current_timestamp);
-
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (1, '2017-12-30', '2018-01-01', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (2, '2018-02-15', '2018-02-21', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (3, '2018-04-05', '2018-04-07', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (4, '2018-04-29', '2018-05-01', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (5, '2018-06-16', '2018-06-18', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (6, '2018-09-22', '2018-09-24', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (7, '2018-10-01', '2018-10-07', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (15, '2018-11-11', '2018-11-11', current_timestamp, current_timestamp);
-
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (1, '2018-12-30', '2019-01-01', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (2, '2019-02-04', '2018-02-10', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (3, '2019-04-05', '2019-04-07', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (4, '2019-05-01', '2019-05-04', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (5, '2019-06-07', '2019-06-09', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (6, '2019-09-13', '2019-09-15', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (7, '2019-10-01', '2019-10-07', current_timestamp, current_timestamp);
-insert into holiday(holiday_type, begin_date, end_date, create_time, update_time)
-values (15, '2019-11-11', '2018-11-11', current_timestamp, current_timestamp);
+    id               bigint unsigned not null,
+    username         varchar(45) not null comment '用户名',
+    password         varchar(45) not null comment '密码',
+    mobile_phone     int unsigned not null default 0 comment '手机',
+    email            varchar(45) not null default '' comment '邮箱',
+    status           tinyint unsigned not null default 1 comment '状态. \n1 : 正常',
+    create_time      datetime    not null default current_timestamp,
+    create_user      bigint unsigned not null,
+    last_modify_time datetime    not null default current_timestamp on update current_timestamp,
+    last_modify_user bigint unsigned not null,
+    is_deleted       bigint unsigned not null default 0,
+    primary key (id),
+    unique index idx_mobile_phone (mobile_phone asc),
+    unique index idx_email (email asc),
+    unique index idx_username (username asc)
+)
+    comment = '个人用户－基本信息';
 
 
--- ============================= hive ======================================
+create table if not exists shop
+(
+    id               bigint unsigned not null,
+    user_id          bigint unsigned not null comment '所属用户id.',
+    shop_name        varchar(45) not null comment '店铺名称',
+    create_time      datetime    not null default current_timestamp,
+    create_user      bigint unsigned not null,
+    last_modify_time datetime    not null default current_timestamp on update current_timestamp,
+    last_modify_user bigint unsigned not null,
+    is_deleted       bigint unsigned not null default 0,
+    primary key (id),
+    index fk_user_id_idx (user_id asc)
+)
+    comment = '店铺信息';
+
+
+create table if not exists item
+(
+    id                bigint unsigned not null,
+    shop_id           bigint unsigned not null comment '所属店铺id . fk shop.id',
+    item_type         tinyint unsigned not null default 1 comment '商品类型 .\n0 . 简单类型，比如：书\n1 . 多规格类型：比如：衣服\n参考 : https://learnwoo.com/woocommerce-different-product-types/',
+    item_name         varchar(45) not null comment '商品名称',
+    category_one_id   bigint unsigned null comment '一级分类 . fk item_category.id',
+    category_two_id   bigint unsigned null comment '二级分类 . fk item_category.id',
+    category_three_id bigint unsigned null comment '三级分类 . fk item_category.id',
+    create_time       datetime    not null default current_timestamp,
+    create_user       bigint unsigned not null,
+    last_modify_time  datetime    not null default current_timestamp on update current_timestamp,
+    last_modify_user  bigint unsigned not null,
+    is_deleted        bigint unsigned not null default 0,
+    primary key (id),
+    index fk_shop_id_idx (shop_id asc),
+    index fk_category_one_id_idx (category_one_id asc),
+    index fk_category_two_id_idx (category_two_id asc),
+    index fk_category_three_id_idx (category_three_id asc)
+)
+    comment = '商品';
+
+
+create table if not exists warehouse
+(
+    id               bigint unsigned not null,
+    user_id          bigint unsigned not null comment '所属用户id',
+    shop_id          bigint unsigned not null comment '所属店铺id',
+    warehouse_type   tinyint unsigned not null default 1 comment '综合仓类型 . \n\n1. virtual . 没有实际仓库\n2. solid . 实体仓库 . 没错 ,　就是这个单词 , 从美剧中学的 .  ',
+    warehouse_name   varchar(45) not null comment '仓库名称',
+    create_time      datetime    not null default current_timestamp,
+    create_user      bigint unsigned not null,
+    last_modify_time datetime    not null default current_timestamp on update current_timestamp,
+    last_modify_user bigint unsigned not null,
+    is_deleted       bigint unsigned not null default 0,
+    primary key (id),
+    index fk_individual_user_id_idx (user_id asc),
+    index fk_shop_id_idx (shop_id asc)
+)
+    comment = '仓库. 代表存放商品的仓库.';
+
+create table if not exists m_item_type
+(
+    time_type    tinyint     not null comment '时间类型',
+    time_id      varchar(10) not null comment '时间id',
+    item_type    tinyint     not null comment '商品类型',
+    user_no      int         not null comment '商家数',
+    item_no      int         not null comment '商品数',
+    shop_no      int         not null comment '店铺数',
+    warehouse_no int         not null comment '仓库数'
+) comment '商品类型集市表';
+
+-- hive
 create database stg;
+create database inte;
 create database dm;
 
 use stg;
-drop table if exists s_holiday;
-create table s_holiday
+drop table if exists s_user;
+create table s_user
 (
-    id           int,
-    create_time  timestamp ,
-    update_time  timestamp ,
-    holiday_type int      ,
-    begin_date   timestamp     ,
-    end_date     timestamp
-)stored as parquet;
+    id               bigint,
+    user_name        varchar(45) comment '用户名',
+    password         varchar(45) comment '密码',
+    mobile_phone     int comment '手机',
+    email            varchar(45) comment '邮箱',
+    status           tinyint comment '状态. \n1 : 正常',
+    create_time      timestamp,
+    create_user      bigint,
+    last_modify_time timestamp,
+    last_modify_user bigint,
+    is_deleted       bigint
+)
+    comment '个人用户－基本信息'
+    partitioned by (time_type tinyint, time_id varchar(10))
+    stored as textfile;
+
+
+drop table if exists s_shop;
+create table s_shop
+(
+    id               bigint,
+    user_id          bigint comment '所属用户id.',
+    shop_name        varchar(45) comment '店铺名称',
+    create_time      timestamp,
+    create_user      bigint,
+    last_modify_time timestamp,
+    last_modify_user bigint,
+    is_deleted       bigint
+)
+    comment '店铺信息'
+    partitioned by (time_type tinyint, time_id varchar(10))
+    stored as textfile;
+
+drop table if exists s_item;
+create table s_item
+(
+    id                bigint,
+    shop_id           bigint comment '所属店铺id . fk shop.id',
+    item_type         tinyint comment '商品类型 .\n0 . 简单类型，比如：书\n1 . 多规格类型：比如：衣服\n参考 : https://learnwoo.com/woocommerce-different-product-types/',
+    item_name         varchar(45) comment '商品名称',
+    category_one_id   bigint comment '一级分类 . fk item_category.id',
+    category_two_id   bigint comment '二级分类 . fk item_category.id',
+    category_three_id bigint comment '三级分类 . fk item_category.id',
+    create_time       timestamp,
+    create_user       bigint,
+    last_modify_time  timestamp,
+    last_modify_user  bigint,
+    is_deleted        bigint
+) comment '商品'
+    partitioned by (time_type tinyint, time_id varchar(10))
+    stored as textfile;
+
+drop table if exists s_warehouse;
+create table s_warehouse
+(
+    id               bigint,
+    user_id          bigint comment '所属用户id',
+    shop_id          bigint comment '所属店铺id',
+    warehouse_type   tinyint comment '综合仓类型 . \n\n1. virtual . 没有实际仓库\n2. solid . 实体仓库 . 没错 ,　就是这个单词 , 从美剧中学的 .  ',
+    warehouse_name   varchar(45) comment '仓库名称',
+    create_time      timestamp,
+    create_user      bigint,
+    last_modify_time timestamp,
+    last_modify_user bigint,
+    is_deleted       bigint
+)
+    comment '仓库. 代表存放商品的仓库.'
+    partitioned by (time_type tinyint, time_id varchar(10))
+    stored as textfile;
+
+
+use inte;
+drop table if exists i_item;
+create table i_item
+(
+    item_id           bigint,
+    user_id           bigint,
+    shop_id           bigint,
+    warehouse_id      bigint,
+    item_type         smallint comment '商品类型',
+    category_one_id   bigint comment '一级分类',
+    category_two_id   bigint comment '二级分类',
+    category_three_id bigint comment '三级分类',
+    warehouse_type    smallint comment '综合仓类型',
+    mobile_phone      int comment '手机',
+    email             varchar(45) comment '邮箱'
+) comment '商品集成表'
+    partitioned by (time_type tinyint, time_id varchar(10))
+    stored as parquet;
+
 
 use dm;
-drop table if exists m_holiday;
-create table m_holiday
-(holiday_type int,
-cnt int
-)stored as parquet;
-
+drop table if exists m_item_type;
+create table m_item_type
+(
+    item_type    tinyint comment '商品类型',
+    user_no      int comment '商家数',
+    item_no      int comment '商品数',
+    shop_no      int comment '店铺数',
+    warehouse_no int comment '仓库数'
+) comment '商品类型集市表'
+    partitioned by (time_type tinyint, time_id varchar(10))
+    stored as parquet;

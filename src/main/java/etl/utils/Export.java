@@ -7,6 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,18 +64,25 @@ public class Export extends ETL {
         }
     }
 
-    private void exeLoadSQL(String table, String sql) {
+    private void  exeLoadSQL(String table, String sql) {
         if (table == null || table.isEmpty()) {
             this.db.exeSQL(sql);
         } else {
             Dataset<Row> df = exeSQL(sql);
-            toLocalDirectory(df, Public.getDataDirectory() + table + "/" + getFrequency() + "/");
+            String frequency = String.valueOf(getFrequency());
+            toLocalDirectory(df, Public.getTableDataDirectory(table, frequency));
+            List<String> files = this.db.getLoadFiles(table, frequency);
+            if (files.isEmpty()) {
+                return;
+            }
+
             switch (this.db.getDbType()) {
                 case "mysql":
-                    this.db.MySQLLoad(table, String.valueOf(getFrequency()));
+                    this.db.MySQLLoad(table, files);
                     break;
                 case "oracle":
-                    this.db.OracleLoad(table, String.valueOf(getFrequency()));
+                    this.db.OracleLoad(table, files);
+                    break;
                 default:
                     logger.error("not support {}", this.db.getDbType());
             }

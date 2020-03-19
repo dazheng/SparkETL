@@ -5,21 +5,13 @@ conf_dir = "/dp/conf"   # 配置文件根路径
 
 hdfs_path = "hdfs://master" # hdfs
 
-[[rdb]]
-id = "dp"
-driver_class = "com.mysql.jdbc.Driver"
-url = "jdbc:mysql://127.0.0.1:3306/test?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8"
-user = "hadoop"
-password = "hadoop"
-
-
 [[db]]
-id = "order_mysql"
+id = "dp"
 db_type = "mysql"
-driver_class = "oracle.jdbc.driver.OracleDriver"
-url = "jdbc:oracle:thin:@127.0.0.1:1521:orcl"
-user = "hadoop"
-password = "hadoop"
+driver_class = "com.mysql.cj.jdbc.Driver"
+url = "jdbc:mysql://192.168.1.5:3306/test?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8"
+user = "test"
+password = "Test123!"
 
 [[db]]
 id = "order_oracle"
@@ -31,14 +23,31 @@ password = "hadoop"
 
 [[db]]
 id = "order_sqlserver"
+dbType = "sqlserver"
 driver_class = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
 url = "jdbc:sqlserver://localhost:1433;DatabaseName=test"
 user = "hadoop"
 password = "hadoop"
 
+[[db]]
+id = "order_postgresql"
+db_type = "postgresql"
+driver_class = "org.postgresql.Driver"
+url = "jdbc:postgresql://localhost:5432/test"
+user = "hadoop"
+password = "hadoop"
+
+[[db]]
+id = "order_db2"
+db_type = "db2"
+driver_class = "com.ibm.db2.jcc.DB2Driver"
+url = "jdbc:db2://localhost:50000/testdb"
+user = "hadoop"
+password = "hadoop"
 
 [[db]]
 id = "log_mongo"
 db_type = "mongodb"
 url = "mongodb://hadoop:hadoop@127.0.0.1:3717/test"
+database = "test"
 

@@ -9,6 +9,6 @@ public class ExportToMySQL extends Export {
     }
 
     public void dpD() {
-        exeSQLFile("dp_d.sql", "insert");
+        exeSQLFile("mysql_d.sql", "export");
     }
 }

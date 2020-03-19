@@ -9,7 +9,11 @@ public class Tran extends Transform {
     }
 
     public void s2iD() {
-        exeSQLFile("s2m_d.sql", "insert");
+        exeSQLFile("s2i_d.sql", "insert");
+    }
+
+    public void i2mD() {
+        exeSQLFile("i2m_d.sql", "insert");
     }
 }
 

@@ -25,7 +25,7 @@ public final class App {
         LocalDateTime start = LocalDateTime.now();
         logger.info(Public.getEqualSep());
         logger.info("start");
-        Integer backDate = 7;
+        Integer backDate = 1; // 回溯天数，支持一次计算多天
         String jobName = "prod";
         int timeType = 1;
         String timeID = LocalDate.now().plusDays(-1).toString();

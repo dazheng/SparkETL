@@ -1,13 +1,25 @@
 package etl.utils;
 
 import com.moandjiezana.toml.Toml;
+import com.mongodb.client.MongoCollection;
+import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.mongodb.client.model.Filters.*;
+import static com.mongodb.client.model.Projections.*;
+
+import com.mongodb.spark.MongoSpark;
 
 import java.util.List;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
+import org.bson.Document;
 
 public class MongoDB {
     private final Logger logger = LoggerFactory.getLogger(RDB.class);
@@ -65,5 +77,31 @@ public class MongoDB {
         return null;
     }
 
+    protected void MongoDBExport(String query, String fileName) {
+        String collection = getCollectionFromSQL(query);
+        String db = getDBFromURl();
+        MongoCollection<Document> coll = getConnection().getDatabase(db).getCollection(collection);
+        coll.find().projection(fields(include("name", "stars", "categories"), excludeId()));
+    }
+
+    private String getCollectionFromSQL(String sql) {
+        return "";
+    }
+
+    private String[] getColumnsFromSQL(String sql) {
+        return null;
+    }
+
+    private String getWhereFromSQL(String sql) {
+        return "";
+    }
+
+    private String getDBFromURl() {
+        return "";
+    }
+
+    protected void MongoDBWrite(@NotNull Dataset<Row> df, String table) {
+        MongoSpark.write(df).option("collection", table).mode("overwrite").save();
+    }
 }
 

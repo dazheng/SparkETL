@@ -9,6 +9,6 @@ public class ExtractFromMySQL extends Extract {
     }
 
     public void dpFull() {
-        exeSQLFile("dp_d.sql", "insert");
+        exeSQLFile("mysql_d.sql", "import");
     }
 }

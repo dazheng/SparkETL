@@ -78,13 +78,13 @@ public class Time {
                 break;
         }
         Map<String, String> map = new HashMap<>();
-        map.put("v_time_type", timeType);
-        map.put("v_time_id", timeID);
-        map.put("v_start_time_id", startTimeID);
-        map.put("v_start_date_id", startDateID);
-        map.put("v_end_date_id", endDateID);
-        map.put("v_start_date_time", startDateTime);
-        map.put("v_end_date_time", endDateTime);
+        map.put("time_type", timeType);
+        map.put("time_id", timeID);
+        map.put("start_time_id", startTimeID);
+        map.put("start_date_id", startDateID);
+        map.put("end_date_id", endDateID);
+        map.put("start_date_time", startDateTime);
+        map.put("end_date_time", endDateTime);
         return map;
     }
 
@@ -110,13 +110,13 @@ public class Time {
         String start = "";
         switch (this.timeType) {
             case 1:
-                start = getTimeParameter("v_start_time_id");
+                start = getTimeParameter("start_time_id");
                 break;
             case 2:
-                start = getTimeParameter("v_time_id");
+                start = getTimeParameter("time_id");
                 break;
             case 3:
-                start = getTimeParameter("v_time_id");
+                start = getTimeParameter("time_id");
                 break;
         }
         return start;
@@ -126,13 +126,13 @@ public class Time {
         String end = "";
         switch (this.timeType) {
             case 1:
-                end = getTimeParameter("v_end_time_id");
+                end = getTimeParameter("time_id");
                 break;
             case 2:
-                end = getTimeParameter("v_time_id");
+                end = getTimeParameter("time_id");
                 break;
             case 3:
-                end = getTimeParameter("v_time_id");
+                end = getTimeParameter("time_id");
                 break;
         }
         return end;

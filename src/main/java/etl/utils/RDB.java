@@ -1,6 +1,7 @@
 package etl.utils;
 
 import com.moandjiezana.toml.Toml;
+import org.apache.commons.lang.StringUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -8,13 +9,14 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
+import javax.xml.transform.Result;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 
@@ -134,6 +136,7 @@ public class RDB {
         }
     }
 
+
     String getTableColumns(String table) {
         StringBuilder cs = new StringBuilder();
         String sql = "";
@@ -177,12 +180,14 @@ public class RDB {
     }
 
     protected List<String> getLoadFiles(String table, String timeType) {
-        String dir = Public.getDataDirectory() + table + "/" + timeType + "/";
-        List<String> files = null;
+        String dir = Public.getTableDataDirectory(table, timeType);
+        List<String> files = new ArrayList<>();
         try {
-            Files.newDirectoryStream(Paths.get(dir), path -> path.toFile().isFile() && !path.toFile().isHidden() && path.toFile().length() > 0)
+            Files.newDirectoryStream(Paths.get(dir), path -> path.toFile().isFile() && !path.toFile().isHidden()
+                && path.toFile().length() > 0)
                 .forEach(f -> {
-                    files.add(f.toString());
+                    String name = f.toFile().getName();
+                    files.add(dir + name);
                 });
         } catch (IOException e) {
             e.printStackTrace();
@@ -190,42 +195,92 @@ public class RDB {
         return files;
     }
 
-    protected void MySQLLoad(String table, String timeType) {
-        List<String> files = getLoadFiles(table, timeType);
-        if (files.isEmpty()) {
-            return;
-        }
+    protected void MySQLLoad(String table, List<String> files) {
         for (String file : files) {
             String sql = String.format(
-                "load data local infile '%s' replace into table %s Fields Terminated By '%s' Lines Terminated By '\\n' ",
-                file, table, Public.getColumnDelimiter());
+                "load data local infile '%s' replace into table %s Fields Terminated By %s Lines Terminated By '\\n' ",
+                file, table, Public.getColumnDelimiterRDB());
             exeSQL(sql);
         }
     }
 
-    protected void OracleLoad(String table, String timeType) { // .ctl文件需要提前定义好
-        List<String> files = getLoadFiles(table, timeType);
-        if (files.isEmpty()) {
-            return;
-        }
+    // .ctl文件需要提前定义好,客户端安装sqlldr工具
+    protected void OracleLoad(String table, List<String> files) {
         try {
             for (String file : files) {
                 String ctlFile = Public.getConfDirectory() + table + ".ctl";
-                String logDir = Public.getLogDirectory() + table + "/" + timeType + "/";
+                String logDir = Public.getLogDirectory() + table + "/";
                 Files.createDirectories(Paths.get(logDir));
                 String logFile = logDir + table + ".log";
                 String badFile = logDir + table + ".bad";
                 String discardFile = Public.getLogDirectory() + table + ".dcd";
-                String sql = String.format(
+                String cmd = String.format(
                     "sqlldr %s/%s@%s control=%s data=%s log=%s bad=%s discard=%s direct=true parallel=true", this.user,
                     this.password, this.jdbcUrl, ctlFile, file, logFile, badFile, discardFile
                 );
-                Public.exeCmd(sql);
+                Public.exeCmd(cmd);
             }
         } catch (IOException e) {
             logger.error(e.toString(), e);
         }
     }
+
+    protected void SQLServerLoad(String table, List<String> files) {
+        for (String file : files) {
+            String sql = String.format(
+                "bulk insert %s from '%s' WITH(FIELDTERMINATOR＝%s, ROWTERMINATOR＝'\\n')",
+                table, file, Public.getColumnDelimiterRDB());
+            exeSQL(sql);
+        }
+    }
+
+    protected void DB2Load(String table, List<String> files) {
+        ;
+    }
+
+    protected void PostgreSQLLoad(String table, List<String> files) {
+        String db = ""; // TODO: 待获取
+        String logDir = Public.getLogDirectory() + table + "/";
+        try {
+            Files.createDirectories(Paths.get(logDir));
+        } catch (IOException e) {
+            logger.error(e.toString(), e);
+        }
+        String logFile = logDir + table + ".log";
+        String badFile = logDir + table + ".bad";
+
+//        pg_bulkload --dbname lottu --username lottu --password --writer=PARALLEL --input /home/postgres/tbl_lottu_output.txt --output tbl_lottu --logfile /home/postgres/tbl_lottu_output.log --parse-badfile=/home/postgres/tbl_lottu_bad.bad  --option "TYPE=CSV" --option "DELIMITER=|"
+        for (String file : files) {
+            String cmd = String.format("pg_bulkload --dbname %s --username %s --password %s --writer=PARALLEL --input %s --output %s --logfile %s --parse-badfile=%s --option \"TYPE=CSV\" --option \"DELIMITER=%s\"",
+                db, this.user, this.password, file, table, logFile, badFile, Public.getColumnDelimiterRDB());
+            Public.exeCmd(cmd);
+        }
+    }
+
+    protected void OracleExport(String query, String fileName) {
+        jdbcToFile(query, fileName);
+    }
+
+
+    protected void MysqlExport(String query, String fileName) {
+        String sql = String.format("%s into outfile '%s' fields terminated by %s lines terminated by '\\n'",
+            query, fileName, Public.getColumnDelimiterRDB());
+        exeSQL(sql);
+//        jdbcToFile(query, fileName);
+    }
+
+    protected void SQLServerExport(String query, String fileName) {
+        jdbcToFile(query, fileName);
+    }
+
+    protected void PostgreSQLExport(String query, String fileName) {
+        jdbcToFile(query, fileName);
+    }
+
+    protected void DB2Export(String query, String fileName) {
+        jdbcToFile(query, fileName);
+    }
+
 //sqlserver 导入 BULK INSERT
 //[表名]
 //    FROM [csv文件地址]
@@ -238,16 +293,48 @@ public class RDB {
 
 //   mysql 导出 select * from f_pc_user_cndt_20101128 into outfile 'd:/f.txt' Fields Terminated By ',' Lines Terminated By '\n'
 
-
-    private String jdbcToFile(String table, String timeType) {
-        String fileName = null;
+    //    jdbc方式从数据库读取数据，然后写成文件
+    private void jdbcToFile(String query, String fileName) {
+        BufferedWriter writer = null;
+        Statement stmt = null;
+        ResultSet rs = null;
         Path path = Paths.get(fileName);
-        try (BufferedWriter writer = Files.newBufferedWriter(path)) {
-            writer.write("d");
-        } catch (Exception e) {
+        try {
+            int idx = fileName.lastIndexOf(Public.getOSPathDelimiter());
+            if (idx == -1) {
+                return;
+            }
+            String dir = fileName.substring(0, idx);
+            if (!Files.exists(Paths.get(dir))) {
+                Files.createDirectory(Paths.get(dir));
+            }
+            Files.deleteIfExists(path);
+            Files.createFile(path);
+            writer = Files.newBufferedWriter(path);
+            stmt = getConnection().prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+            stmt.setFetchSize(Integer.MIN_VALUE);
+            rs = stmt.executeQuery(query);
+            ResultSetMetaData meta = rs.getMetaData();
+            int cnt = meta.getColumnCount();
+            String[] cols = new String[cnt];
+            while (rs.next()) {
+                for (int i = 0; i < cnt; i++) { // 下标从1开始
+                    cols[i] = rs.getString(i + 1);
+                }
+                writer.write(StringUtils.join(cols, Public.getColumnDelimiter()) + "\n");
+            }
+        } catch (IOException | SQLException e) {
             logger.error(e.toString(), e);
+        } finally {
+            assert writer != null;
+            try {
+                writer.close();
+            } catch (IOException e) {
+                logger.error(e.toString(), e);
+            }
+            close(rs);
+            close(stmt);
         }
-        return fileName;
     }
 
     private Dataset<Row> jdbcRead(@NotNull SparkSession spark, String sql) {

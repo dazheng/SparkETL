@@ -6,6 +6,7 @@ import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.List;
 
 public class Transform extends ETL {
@@ -23,6 +24,11 @@ public class Transform extends ETL {
 
     }
 
+    /**
+     * 删除hive对应分区
+     *
+     * @param tables 表名列表
+     */
     public void dropHivePartition(List<String> tables) {
         for (String t : tables) {
             String start = getStartTimeID();
@@ -35,7 +41,14 @@ public class Transform extends ETL {
         }
     }
 
-    private void exeSQL(String dir, String sql) {
+    /**
+     * 执行SQL，如果需要导出就导出到本地
+     *
+     * @param dir 导出的本地目录
+     * @param sql sql语句
+     * @throws IOException
+     */
+    private void exeSQL(String dir, String sql) throws IOException {
         if (dir != null && !dir.isEmpty()) {
             logger.info(dir);
         }
@@ -45,11 +58,18 @@ public class Transform extends ETL {
         }
     }
 
-    protected void exeSQLFile(String fileName, String exeType) {
+    /**
+     * 根据类型执行sql文件内容
+     *
+     * @param fileName sql文件名
+     * @param exeType  执行类型
+     * @throws Exception
+     */
+    protected void exeSQLFile(String fileName, String exeType) throws Exception {
         String sqls = Public.readSqlFile(getTransformSqlDir() + fileName);
         exeType = exeType.toLowerCase();
         if (exeType.equals("insert")) {
-            exeSQLs(sqls, this::exeSQL, 1);
+            exeSQLs(sqls, Public.rethrowBiConsumer(this::exeSQL), 1);
         } else if (exeType.equals("view")) {
             exeSQLs(sqls, this::sqlToSpecialView, 2);
         }

@@ -21,6 +21,9 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 
 
+/**
+ * ETL处理的主程序
+ */
 public class ETL extends Time {
     private final Logger logger = LoggerFactory.getLogger(Time.class);
     private final SparkSession spark;
@@ -34,6 +37,13 @@ public class ETL extends Time {
         this.spark = spark;
     }
 
+    /**
+     * 根据类型不同，对输入的单独一行进行不同的处理
+     *
+     * @param line 要解析的行
+     * @param type 解析类型
+     * @return 解析后的sql片段
+     */
     @NotNull
     private Map<String, String> decideByType(@NotNull String line, Integer type) {
         String lineLower = line.toLowerCase();
@@ -66,6 +76,13 @@ public class ETL extends Time {
         return map;
     }
 
+    /**
+     * 根据不同类型，进行不同的解析
+     *
+     * @param fromSql 要解析的SQL
+     * @param type    类型
+     * @return 解析后的SQL
+     */
     private Map<String, String> parseSQL(String fromSql, Integer type) {
         String isRunable = this.not;
         String insert = "";
@@ -76,6 +93,10 @@ public class ETL extends Time {
             String l = line.trim().toLowerCase();
             if (!l.substring(0, 2).equals("--") && !l.substring(0, 2).equals("//")) {
                 isRunable = this.is;
+            }
+            l = l.split("--")[0];
+            if (l.trim().length() < 2) {
+                continue;
             }
             if (isRunable.equals(this.is)) {
                 Map<String, String> rs = decideByType(l, type);
@@ -96,6 +117,12 @@ public class ETL extends Time {
         return map;
     }
 
+    /**
+     * 建SQL语句中的参数用具体的值替换掉
+     *
+     * @param sql SQL语句
+     * @return 替换后的SQL
+     */
     private String replaceSQLParameters(String sql) {
         Map<String, String> paras = getTimeParameters();
         for (Map.Entry<String, String> entry : paras.entrySet()) {
@@ -104,7 +131,15 @@ public class ETL extends Time {
         return sql;
     }
 
-    void exeSQLs(String sqlString, BiConsumer<String, String> func, Integer type) {
+    /**
+     * 执行N个SQL语句
+     *
+     * @param sqlString SQL内容端
+     * @param func      执行单个SQL的方法
+     * @param type      类型
+     * @throws Exception
+     */
+    void exeSQLs(String sqlString, BiConsumer<String, String> func, Integer type) throws Exception {
         if (sqlString == null || func == null || sqlString.trim().isEmpty()) {
             return;
         }
@@ -126,7 +161,12 @@ public class ETL extends Time {
     }
 
 
-    //    是否需要返回
+    /**
+     * 执行SQL
+     *
+     * @param sql
+     * @return
+     */
     Dataset<Row> exeSQL(String sql) {
         LocalDateTime start = LocalDateTime.now();
         logger.info(Public.getMinusSep());
@@ -136,7 +176,14 @@ public class ETL extends Time {
         return df;
     }
 
-    void toLocalDirectory(Dataset<Row> df, String localDir) {
+    /**
+     * 将Dataset的结果生成hdfs文件，然后再同步到本地
+     *
+     * @param df       Dataset
+     * @param localDir 本地目录
+     * @throws IOException
+     */
+    void toLocalDirectory(Dataset<Row> df, String localDir) throws IOException {
         FileSystem fileSystem = null;  //操作Hdfs核心类
         Configuration configuration = null;  //配置类
         Toml toml = Public.getParameters();
@@ -150,30 +197,46 @@ public class ETL extends Time {
             configuration.set("fs.defaultFS", HDFS_PATH);
             fileSystem = FileSystem.get(configuration);
             fileSystem.copyToLocalFile(new Path(hdfsDir), new Path(localDir));
-        } catch (Exception e) {
-            logger.error(e.toString(), e);
+//        } catch (Exception e) {
+//            logger.error(e.toString(), e);
         } finally {
-            assert configuration != null;
-            configuration.clear();
-            assert fileSystem != null;
-            try {
+            if (configuration != null) {
+                configuration.clear();
+            }
+            if (fileSystem != null) {
                 fileSystem.close();
-            } catch (IOException e) {
-                logger.error(e.toString(), e);
             }
         }
     }
 
+    /**
+     * sql语句生成指定的临时视图
+     *
+     * @param table 表名
+     * @param sql   SQL语句
+     */
     void sqlToSpecialView(String table, String sql) {
         Dataset<Row> df = exeSQL(sql);
         df.createOrReplaceTempView("v_" + table);
     }
 
+    /**
+     * 将文件load到hive中
+     *
+     * @param insertSQL SQL语句
+     * @param file      文件
+     */
     protected void hiveLoad(String insertSQL, String file) {
         String sql = String.format("load data local inpath '%s' %s ", file, getHiveLoad(insertSQL));
         exeSQL(sql);
     }
 
+    /**
+     * 根据insert SQL语句获取load语句
+     *
+     * @param insertSQL insert语句
+     * @return load语句
+     */
     private String getHiveLoad(String insertSQL) {
         return insertSQL.replace("insert overwrite", "overwrite into")
             .replace("insert into", "into");

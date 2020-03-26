@@ -1,49 +1,50 @@
 [base]
 log_dir = "/dp/log/"    # 日志文件根路径
 data_dir = "/dp/data/hive_exchange/"    # 数据文件根路径
-conf_dir = "/dp/conf"   # 配置文件根路径
-
+conf_dir = "/dp/conf/"   # 配置文件根路径, 如oracle sqlldr控制文件
 hdfs_path = "hdfs://master" # hdfs
+jdbc_fetch_size = 1000 # jdbc每次读取大小
+jdbc_batch_size = 1000 # jdbc每次写入大小
 
 [[db]]
 id = "dp"
 db_type = "mysql"
 driver_class = "com.mysql.cj.jdbc.Driver"
-url = "jdbc:mysql://192.168.1.5:3306/test?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8"
+url = "jdbc:mysql://db:3306/mysql_tester?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8"
 user = "test"
-password = "Test123!"
+password = "Test123$"
 
 [[db]]
-id = "order_oracle"
+id = "oracle"
 db_type = "oracle"
 driver_class = "oracle.jdbc.driver.OracleDriver"
-url = "jdbc:oracle:thin:@127.0.0.1:1521:test"
-user = "hadoop"
-password = "hadoop"
+url = "jdbc:oracle:thin:@db:1521:test"
+user = "test"
+password = "Test123$"
 
 [[db]]
-id = "order_sqlserver"
-dbType = "sqlserver"
+id = "sqlserver"
+db_type = "sqlserver"
 driver_class = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
-url = "jdbc:sqlserver://localhost:1433;DatabaseName=test"
-user = "hadoop"
-password = "hadoop"
+url = "jdbc:sqlserver://db:1433;DatabaseName=test"
+user = "sa"
+password = "Test123$"
 
 [[db]]
-id = "order_postgresql"
+id = "postgresql"
 db_type = "postgresql"
 driver_class = "org.postgresql.Driver"
-url = "jdbc:postgresql://localhost:5432/test"
-user = "hadoop"
-password = "hadoop"
+url = "jdbc:postgresql://db:5432/test"
+user = "test"
+password = "Test123$"
 
 [[db]]
-id = "order_db2"
+id = "db2"
 db_type = "db2"
 driver_class = "com.ibm.db2.jcc.DB2Driver"
-url = "jdbc:db2://localhost:50000/testdb"
-user = "hadoop"
-password = "hadoop"
+url = "jdbc:db2://db:50000/test"
+user = "test"
+password = "Test123$"
 
 [[db]]
 id = "log_mongo"

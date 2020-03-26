@@ -9,6 +9,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 时间相关处理
+ */
 public class Time {
     private final Logger logger = LoggerFactory.getLogger(Time.class);
     private final Integer timeType;
@@ -49,6 +52,11 @@ public class Time {
         return timeParas;
     }
 
+    /**
+     * 根据传入的timeType,timeID生成时间相关的参数
+     *
+     * @return 时间参数map
+     */
     private Map<String, String> generateTimeParameters() {
         String startTimeID = "";
         String startDateID = "";
@@ -88,6 +96,13 @@ public class Time {
         return map;
     }
 
+
+    /**
+     * 得到下一个timeID
+     *
+     * @param timeID
+     * @return
+     */
     protected String getNextTimeID(String timeID) {
         switch (this.timeType) {
             case 1:
@@ -106,6 +121,11 @@ public class Time {
         return this.timeParas.get(varTime);
     }
 
+    /**
+     * 获取开始的timeID
+     *
+     * @return timeID
+     */
     protected String getStartTimeID() {
         String start = "";
         switch (this.timeType) {
@@ -122,6 +142,12 @@ public class Time {
         return start;
     }
 
+
+    /**
+     * 获取结束的timeID
+     *
+     * @return timeID
+     */
     protected String getEndTimeID() {
         String end = "";
         switch (this.timeType) {

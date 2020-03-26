@@ -24,17 +24,18 @@ public final class App {
         final Logger logger = LoggerFactory.getLogger(App.class);
         LocalDateTime start = LocalDateTime.now();
         logger.info(Public.getEqualSep());
-        logger.info("start");
+
         Integer backDate = 1; // 回溯天数，支持一次计算多天
         String jobName = "prod";
         int timeType = 1;
         String timeID = LocalDate.now().plusDays(-1).toString();
 
-        if (args.length == 4) {
-            jobName = args[1].toLowerCase();
-            timeType = Integer.parseInt(args[2]);
-            timeID = args[3];
+        if (args.length == 3) {
+            jobName = args[0].toLowerCase();
+            timeType = Integer.parseInt(args[1]);
+            timeID = args[2];
         }
+
         job(jobName, timeType, timeID, backDate);
     }
 }

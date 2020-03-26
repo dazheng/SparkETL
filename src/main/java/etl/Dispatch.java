@@ -7,9 +7,13 @@ import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
+/**
+ * 批处理调度
+ */
 class Dispatch {
     private static final Logger logger = LoggerFactory.getLogger(Dispatch.class);
     private final Integer timeType;
@@ -23,21 +27,31 @@ class Dispatch {
         this.backDate = backDate;
     }
 
-    private void extractD() {
-        ExtractFromMySQL dp = new ExtractFromMySQL(this.spark, this.timeType, this.timeID, this.backDate, "dp", this.timeType);
+    /** 天粒度数据获取
+     * @throws Exception
+     */
+    private void extractD() throws Exception {
+        ExtractFromMySQL dp = new ExtractFromMySQL(this.spark, this.timeType, this.timeID, this.backDate, "postgresql", this.timeType);
         dp.dpFull();
         dp.release();
     }
 
-    private void transformD() {
+    /** 天粒度转换
+     * @throws Exception
+     */
+    private void transformD() throws Exception {
         Tran t = new Tran(this.spark, this.timeType, this.timeID, this.backDate, this.timeType);
         t.s2iD();
         t.i2mD();
         t.release();
     }
 
-    private void exportD() {
-        ExportToMySQL dp = new ExportToMySQL(this.spark, this.timeType, this.timeID, this.backDate, "dp", this.timeType);
+
+    /** 天粒度数据导出及导出后的计算
+     * @throws Exception
+     */
+    private void exportD() throws Exception {
+        ExportToMySQL dp = new ExportToMySQL(this.spark, this.timeType, this.timeID, this.backDate, "postgresql", this.timeType);
         dp.dpD();
         dp.release();
     }
@@ -46,6 +60,9 @@ class Dispatch {
         this.spark = SparkSession.builder().appName(appName).enableHiveSupport().getOrCreate();
     }
 
+    /**
+     * 正式的任务
+     */
     public void prod() {
         String appName = "";
         LocalDateTime start = LocalDateTime.now();
@@ -53,14 +70,16 @@ class Dispatch {
             switch (this.timeType) {
                 case 1:
                     appName = "etl_day";
+                    startLog(appName);
                     setSpark(appName);
                     this.backDate = 1;
-                    extractD();
-                    transformD();
+//                    extractD();
+//                    transformD();
                     exportD();
                     break;
                 case 11:
                     appName = "etl_1hour";
+                    startLog(appName);
                     setSpark(appName);
                     break;
             }
@@ -68,7 +87,11 @@ class Dispatch {
             logger.error(e.toString(), e);
         } finally {
             this.spark.stop();
-            logger.info("{} time taken {} s", appName, Duration.between(start, LocalDateTime.now()).getSeconds());
+            logger.info("timeID={} appName={} time taken {} s", timeID, appName, Duration.between(start, LocalDateTime.now()).getSeconds());
         }
+    }
+
+    public void startLog(String appName) {
+        logger.info("timeID={} appName={} start", timeID, appName);
     }
 }

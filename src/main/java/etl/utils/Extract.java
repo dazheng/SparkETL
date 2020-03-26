@@ -6,19 +6,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 
+/**
+ * 从RDB中抽取数据
+ */
 public class Extract extends ETL {
     private final Logger logger = LoggerFactory.getLogger(Extract.class);
     private final SparkSession spark;
     private final RDB db;
 
-    public Extract(SparkSession spark, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) {
+    public Extract(SparkSession spark, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) throws SQLException, ClassNotFoundException {
         super(spark, timeType, timeID, backDate, frequency);
         this.spark = spark;
         this.db = new RDB(dbID);
     }
 
-    public void release() {
+    public void release() throws SQLException {
         this.db.release();
     }
 
@@ -26,46 +32,78 @@ public class Extract extends ETL {
         return "extract/";
     }
 
+    /**
+     * rdb的SQL生成v_table的临时视图
+     *
+     * @param table 表名
+     * @param sql   执行的SQL
+     */
     private void exeViewSQL(String table, String sql) {
         this.db.sqlToSpecialView(this.spark, table, sql);
     }
 
-    public void exeViewSQLs(String sqls) {
+    /**
+     * 将执行的N个sql生成指定的临时视图
+     *
+     * @param sqls n个SQL语句内容
+     * @throws Exception
+     */
+    public void exeViewSQLs(String sqls) throws Exception {
         exeSQLs(sqls, this::exeViewSQL, 2);
     }
 
+    /**
+     * 执行简单的插入，通过jdbc接口方式将SQL执行结果保存到hive中
+     *
+     * @param insertSql 插入hive表的语句
+     * @param querySql  查询rdb的语句
+     */
     private void exeInsertSQL(String insertSql, String querySql) {
         this.db.sqlToView(this.spark, querySql);
         insertSql = insertSql + " select * from v_tmp";
         exeSQL(insertSql);
     }
 
-    protected void exeSQLFile(String fileName, String exeType) {
+    /**
+     * 根据不同类型，以不同的方式执行SQL文件内容
+     *
+     * @param fileName sql文件名
+     * @param exeType  执行类型
+     * @throws Exception
+     */
+    protected void exeSQLFile(String fileName, String exeType) throws Exception {
         String sqls = Public.readSqlFile(getExtractSQLDirectory() + fileName);
         exeType = exeType.toLowerCase();
         if (exeType.equals("insert")) {
             exeSQLs(sqls, this::exeInsertSQL, 2);
-        } else if (exeType.equals("import")) {
-            exeSQLs(sqls, this::exeImportSQL, 2);
+        } else if (exeType.equals("load")) {
+            exeSQLs(sqls, Public.rethrowBiConsumer(this::exeLoadSQL), 2);
+        } else {
+            logger.error("not support {}", exeType);
         }
     }
 
-    private void exeImportSQL(String insertSQL, String sql) {
+    /**
+     * 将rdb查询结果保存成文件，然后以load方式入hive
+     *
+     * @param insertSQL 插入hive的SQL语句
+     * @param sql       查询rdb的SQL语句
+     * @throws Exception
+     */
+    private void exeLoadSQL(String insertSQL, String sql) throws Exception {
+        LocalDateTime start = LocalDateTime.now();
         if (insertSQL != null && !insertSQL.trim().isEmpty()) {
-            logger.info(insertSQL);
+            logger.debug(Public.getMinusSep());
+            logger.debug(insertSQL);
         }
 
         // 从insertSQL中分离出table,time_type；如果没有time_type，取默认1
-        String timeType = "1";
+        String timeType = String.valueOf(this.getTimeType());
         assert insertSQL != null;
         insertSQL = insertSQL.toLowerCase();
         String table = getTableFromSQL(insertSQL);
         if (table == null) {
             return;
-        }
-        String tt = getTimeTypeFromSQL(insertSQL);
-        if (tt != null) {
-            timeType = tt;
         }
         String fileName = Public.getTableDataDirectory(table, timeType) + table + ".txt";
 
@@ -77,12 +115,28 @@ public class Extract extends ETL {
             case "oracle":
                 this.db.OracleExport(sql, fileName);
                 break;
+            case "sqlserver":
+                this.db.SQLServerExport(sql, fileName, table);
+                break;
+            case "postgresql":
+                this.db.PostgreSQLExport(sql, fileName);
+                break;
+            case "db2":
+                this.db.DB2Export(sql, fileName);
+                break;
             default:
                 logger.error("not support {}", this.db.getDbType());
         }
+        Public.printDuration(start, LocalDateTime.now());
         this.hiveLoad(insertSQL, fileName);
     }
 
+    /**
+     * 从插入的SQL中获取目标表名
+     *
+     * @param insertSQL 插入SQL
+     * @return 目标表名
+     */
     private String getTableFromSQL(String insertSQL) {
         String[] sqls = insertSQL.split(" ");
         for (int i = 0; i < sqls.length; i++) {
@@ -95,18 +149,4 @@ public class Extract extends ETL {
         return null;
     }
 
-    private String getTimeTypeFromSQL(String insertSQL) {
-        String s = "\\("; // "("
-        String[] sqls = insertSQL.split(s);
-        for (String sql : sqls) {
-            int idx = sql.indexOf("time_type");
-            if (idx != -1) {
-                String[] ss = sql.substring(idx).split("=");
-                if (ss.length >= 2) {
-                    return ss[1].substring(0, ss[1].indexOf(",") - 1).trim(); // TODO：测试
-                }
-            }
-        }
-        return null;
-    }
 }

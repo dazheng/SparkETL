@@ -7,22 +7,31 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
+import java.io.IOException;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 
+/**
+ * 将spark结算结果同步到RDBMS中
+ */
 public class Export extends ETL {
     private final Logger logger = LoggerFactory.getLogger(Export.class);
     private final RDB db;
 
-    public Export(SparkSession spark, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) {
+    public Export(SparkSession spark, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) throws SQLException, ClassNotFoundException {
         super(spark, timeType, timeID, backDate, frequency);
         this.db = new RDB(dbID);
     }
 
-    public void release() {
+    /**
+     * 释放申请的资源，目前是只有数据库连接
+     *
+     * @throws SQLException
+     */
+    public void release() throws SQLException {
         this.db.release();
     }
 
@@ -30,33 +39,73 @@ public class Export extends ETL {
         return "export/";
     }
 
-    private void deleteRDBTable(String table) {
+    /**
+     * 删除RDB的数据
+     *
+     * @param table rdb表名
+     * @throws SQLException
+     */
+    private void deleteRDBTable(String table) throws SQLException {
         String start = getStartTimeID();
         String end = getEndTimeID();
         String sql = String.format("delete from %s where time_type = %s and time_id between '%s' and '%s'", table, getTimeType(), start, end);
         this.db.exeSQL(sql);
     }
 
+    /**
+     * SQL结果保存成rdb表
+     *
+     * @param table
+     * @param sql
+     */
     private void sql2RDBTable(String table, String sql) {
         Dataset<Row> df = exeSQL(sql);
         this.db.jdbcWrite(df, table);
     }
 
-    private void toRDBTableIncreate(String table, String sql) {
+    /**
+     * 先删除增量结果，然后将sql结果保存到rdb的表中
+     *
+     * @param table rdb表名
+     * @param sql   执行的sql语句
+     * @throws SQLException
+     */
+    private void toRDBTableIncreate(String table, String sql) throws SQLException {
         deleteRDBTable(table);
         sql2RDBTable(table, sql);
     }
 
-    private void toRDBTableFull(String table, String sql) {
+    /**
+     * 先删除整个表，然后将sql结果保存到rdb的表中
+     *
+     * @param table
+     * @param sql
+     * @throws SQLException
+     */
+    private void toRDBTableFull(String table, String sql) throws SQLException {
         this.db.exeSQL("truncate table " + table);
         sql2RDBTable(table, sql);
     }
 
-    private void exeRDBSQL(String dir, String sql) {
+    /**
+     * 执行rdb中的SQL
+     *
+     * @param insertSQL 插入的SQL
+     * @param sql       要执行的SQL
+     * @throws SQLException
+     */
+    private void exeRDBSQL(String insertSQL, String sql) throws SQLException {
         this.db.exeSQL(sql);
     }
 
-    private void exeInsertSQL(String table, String sql) {
+    /**
+     * sql查询结果同步到表中
+     *
+     * @param table
+     * @param sql
+     * @throws SQLException
+     */
+    private void exeInsertSQL(String table, String sql) throws SQLException {
         if (table == null || table.isEmpty()) {
             this.db.exeSQL(sql);
         } else {
@@ -64,7 +113,16 @@ public class Export extends ETL {
         }
     }
 
-    private void  exeLoadSQL(String table, String sql) {
+    /**
+     * 将sql结果生成本地文件，然后以load方式入RDB库
+     *
+     * @param table 表名
+     * @param sql   要执行的SQL
+     * @throws SQLException
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private void exeLoadSQL(String table, String sql) throws SQLException, IOException, InterruptedException {
         if (table == null || table.isEmpty()) {
             this.db.exeSQL(sql);
         } else {
@@ -83,30 +141,53 @@ public class Export extends ETL {
                 case "oracle":
                     this.db.OracleLoad(table, files);
                     break;
+                case "sqlserver":
+                    this.db.SQLServerLoad(table, files);
+                    break;
+                case "postgresql":
+                    this.db.PostgreSQLLoad(table, files);
+                    break;
+                case "db2":
+                    this.db.DB2Load(table, files);
+                    break;
                 default:
                     logger.error("not support {}", this.db.getDbType());
             }
         }
     }
 
-    protected void exeSQLFile(String fileName, String exeType) {
+    /**
+     * 读取sql文件，以不同的方式将数据同步到RDB中
+     *
+     * @param fileName
+     * @param exeType
+     * @throws Exception
+     */
+    protected void exeSQLFile(String fileName, String exeType) throws Exception {
         String sqls = Public.readSqlFile(getExportSqlDir() + fileName);
         exeType = exeType.toLowerCase();
         switch (exeType) {
             case "insert":
-                exeSQLs(sqls, this::exeInsertSQL, 3);
+                exeSQLs(sqls, Public.rethrowBiConsumer(this::exeInsertSQL), 3);
                 break;
-            case "export":
-                exeSQLs(sqls, this::exeLoadSQL, 3);
+            case "load":
+                exeSQLs(sqls, Public.rethrowBiConsumer(this::exeLoadSQL), 3);
                 break;
             case "db":
-                exeSQLs(sqls, this::exeRDBSQL, 1);
+                exeSQLs(sqls, Public.rethrowBiConsumer(this::exeRDBSQL), 1);
                 break;
         }
     }
 
 
-    private Map<String, String> RDBTableInfo(@NotNull String table) {
+    /**
+     * 获取目标表的字段
+     *
+     * @param table 表名
+     * @return 表名，以逗号分隔的列名字符串
+     * @throws SQLException
+     */
+    private Map<String, String> getRDBTableColumns(@NotNull String table) throws SQLException {
         String[] nt = table.split(".");
         String nativeTable = nt.length == 2 ? nt[1] : table;
         String cs = this.db.getTableColumns(nativeTable);
@@ -119,9 +200,15 @@ public class Export extends ETL {
         return map;
     }
 
-    public void simpleToRDBIncrease(@NotNull List<String> tables) {
+    /**
+     * 将表名中的内容，增量方式同步到RDB中。需要原表、目标表的表名、字段名、字段类型完全一致
+     *
+     * @param tables 表名列表
+     * @throws SQLException
+     */
+    public void simpleToRDBIncrease(@NotNull List<String> tables) throws SQLException {
         for (String table : tables) {
-            Map<String, String> paras = RDBTableInfo(table);
+            Map<String, String> paras = getRDBTableColumns(table);
             assert paras != null;
             String nativeTable = paras.get("native_table");
             String cs = paras.get("columns");
@@ -132,9 +219,15 @@ public class Export extends ETL {
         }
     }
 
-    public void simpleToRDBFull(@NotNull List<String> tables) {
+    /**
+     * 将表名中的内容，全量方式同步到RDB中。需要原表、目标表的表名、字段名、字段类型完全一致
+     *
+     * @param tables 表名列表
+     * @throws SQLException
+     */
+    public void simpleToRDBFull(@NotNull List<String> tables) throws SQLException {
         for (String table : tables) {
-            Map<String, String> paras = RDBTableInfo(table);
+            Map<String, String> paras = getRDBTableColumns(table);
             assert paras != null;
             String nativeTable = paras.get("native_table");
             String cs = paras.get("columns");

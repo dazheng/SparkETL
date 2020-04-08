@@ -18,9 +18,9 @@ password = "Test123$"
 id = "oracle"
 db_type = "oracle"
 driver_class = "oracle.jdbc.driver.OracleDriver"
-url = "jdbc:oracle:thin:@db:1521:test"
-user = "test"
-password = "Test123$"
+url = "jdbc:oracle:thin:@//db:1521/testdb"
+user = "c##test"
+password = "Test1234"
 
 [[db]]
 id = "sqlserver"

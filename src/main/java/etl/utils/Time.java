@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -77,9 +76,6 @@ public class Time {
                 break;
             case 11:
                 LocalDate dateTime = LocalDate.parse(this.timeID, this.dateTimeFormatter);
-                startDateTime = timeID;
-                DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
-                endDateTime = dateTime.plus(-(this.backDate - 1), ChronoUnit.MINUTES).format(formatter2) + ":59";
                 timeID = dateTime.format(dateFormatter);
                 startDateTime = timeID + " 00:00:00";
                 endDateTime = timeID + " 23:59:59";
@@ -103,7 +99,7 @@ public class Time {
      * @param timeID
      * @return
      */
-    protected String getNextTimeID(String timeID) {
+    protected String getNextTimeID(String timeID) throws Exception {
         switch (this.timeType) {
             case 1:
                 return LocalDate.parse(this.timeID, this.dateTimeFormatter).plusDays(1).format(this.dateFormatter);
@@ -113,7 +109,7 @@ public class Time {
                 return LocalDate.parse(this.timeID, this.monthFormatter).plusMonths(1).format(this.dateFormatter);
             default:
                 this.logger.error("not support time_type={}", this.timeType);
-                return timeID;
+                throw new Exception("not support " + String.valueOf(this.timeType));
         }
     }
 

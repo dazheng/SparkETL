@@ -22,12 +22,11 @@ public final class App {
 
     public static void main(String[] args) {
         final Logger logger = LoggerFactory.getLogger(App.class);
-        LocalDateTime start = LocalDateTime.now();
         logger.info(Public.getEqualSep());
 
         Integer backDate = 1; // 回溯天数，支持一次计算多天
         String jobName = "prod";
-        int timeType = 1;
+        Integer timeType = 1; // time_type: 1 日； 2 周；3 月； 4 年；11 小时； 12 半小时； 13 10分钟； 14 5分钟； 15 1分钟
         String timeID = LocalDate.now().plusDays(-1).toString();
 
         if (args.length == 3) {

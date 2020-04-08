@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 
 /**
  * 公用的功能
@@ -25,7 +24,7 @@ public class Public {
     //    private final static String DEFAULT_COL_DELIMITER = ",";  // 数据文件列分隔符
     static final Properties PROPERTIES = new Properties(System.getProperties());
     private final static String LineDelimiter = PROPERTIES.getProperty("line.separator"); // 操作系统换行符
-    private final static String pathDelimiter = PROPERTIES.getProperty("path.separator"); // 操作系统路径分隔符
+    private final static String FileDelimiter = PROPERTIES.getProperty("file.separator"); // 操作系统路径分隔符
 
     private static Toml toml = parseParameters(); // 获取解析后的toml配置文件
 
@@ -52,13 +51,8 @@ public class Public {
         return LineDelimiter;
     }
 
-    public static String getOSPathDelimiter() { // 目前只支持Linux系统
-//        return pathDelimiter;
-        return "/";
-    }
-
-    public static String trim(String s) {
-        return s.trim().replaceAll("[\n|\r|\t|\"|" + DEFAULT_COL_DELIMITER + "]", ""); // TODO:修正正则表达式
+    public static String getOSFileDelimiter() { // 目前只支持Linux系统
+        return FileDelimiter;
     }
 
     static void printDuration(LocalDateTime start, LocalDateTime end) {
@@ -209,7 +203,10 @@ public class Public {
                 params = jdbcUrl.substring(pos2 + 1);
             }
 
-            if (connUri.startsWith("//")) {
+            if (connUri.startsWith("//") || connUri.startsWith("thin:@")) {
+                if (connUri.startsWith("thin:@")) {
+                    connUri = connUri.substring(6);
+                }
                 if (driverName.equals("sqlserver")) {
                     String[] parmsArray = params.split("&");
                     for (String p : parmsArray) {

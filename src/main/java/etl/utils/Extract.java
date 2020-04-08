@@ -1,14 +1,11 @@
 package etl.utils;
 
 import org.apache.spark.sql.SparkSession;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 
 /**
  * 从RDB中抽取数据
@@ -74,12 +71,13 @@ public class Extract extends ETL {
     protected void exeSQLFile(String fileName, String exeType) throws Exception {
         String sqls = Public.readSqlFile(getExtractSQLDirectory() + fileName);
         exeType = exeType.toLowerCase();
-        if (exeType.equals("insert")) {
+        if ("insert".equals(exeType)) {
             exeSQLs(sqls, this::exeInsertSQL, 2);
-        } else if (exeType.equals("load")) {
+        } else if ("load".equals(exeType)) {
             exeSQLs(sqls, Public.rethrowBiConsumer(this::exeLoadSQL), 2);
         } else {
-            logger.error("not support {}", exeType);
+            this.logger.error("not support {}", exeType);
+            throw new Exception("not support " + exeType);
         }
     }
 
@@ -93,8 +91,8 @@ public class Extract extends ETL {
     private void exeLoadSQL(String insertSQL, String sql) throws Exception {
         LocalDateTime start = LocalDateTime.now();
         if (insertSQL != null && !insertSQL.trim().isEmpty()) {
-            logger.debug(Public.getMinusSep());
-            logger.debug(insertSQL);
+            this.logger.debug(Public.getMinusSep());
+            this.logger.debug(insertSQL);
         }
 
         // 从insertSQL中分离出table,time_type；如果没有time_type，取默认1
@@ -125,7 +123,8 @@ public class Extract extends ETL {
                 this.db.DB2Export(sql, fileName);
                 break;
             default:
-                logger.error("not support {}", this.db.getDbType());
+                this.logger.error("not support {}", this.db.getDbType());
+                throw new Exception("not support " + this.db.getDbType());
         }
         Public.printDuration(start, LocalDateTime.now());
         this.hiveLoad(insertSQL, fileName);
@@ -140,7 +139,7 @@ public class Extract extends ETL {
     private String getTableFromSQL(String insertSQL) {
         String[] sqls = insertSQL.split(" ");
         for (int i = 0; i < sqls.length; i++) {
-            if (sqls[i].equals("table")) {
+            if ("table".equals(sqls[i])) {
                 if (!sqls[i + 1].equals(" ")) {
                     return sqls[i + 1];
                 }

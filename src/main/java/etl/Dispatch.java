@@ -1,21 +1,20 @@
 package etl;
 
-import etl.export.ExportToMySQL;
-import etl.extract.ExtractFromMySQL;
+import etl.export.ExportToRDB;
+import etl.extract.ExtractFromRDB;
 import etl.transform.Tran;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.SQLException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 
 /**
  * 批处理调度
  */
-class Dispatch {
-    private static final Logger logger = LoggerFactory.getLogger(Dispatch.class);
+public class Dispatch {
+    private final Logger logger = LoggerFactory.getLogger(Dispatch.class);
     private final Integer timeType;
     private final String timeID;
     private SparkSession spark;
@@ -27,16 +26,20 @@ class Dispatch {
         this.backDate = backDate;
     }
 
-    /** 天粒度数据获取
+    /**
+     * 天粒度数据获取
+     *
      * @throws Exception
      */
     private void extractD() throws Exception {
-        ExtractFromMySQL dp = new ExtractFromMySQL(this.spark, this.timeType, this.timeID, this.backDate, "postgresql", this.timeType);
+        ExtractFromRDB dp = new ExtractFromRDB(this.spark, this.timeType, this.timeID, this.backDate, "oracle", this.timeType);
         dp.dpFull();
         dp.release();
     }
 
-    /** 天粒度转换
+    /**
+     * 天粒度转换
+     *
      * @throws Exception
      */
     private void transformD() throws Exception {
@@ -47,11 +50,13 @@ class Dispatch {
     }
 
 
-    /** 天粒度数据导出及导出后的计算
+    /**
+     * 天粒度数据导出及导出后的计算
+     *
      * @throws Exception
      */
     private void exportD() throws Exception {
-        ExportToMySQL dp = new ExportToMySQL(this.spark, this.timeType, this.timeID, this.backDate, "postgresql", this.timeType);
+        ExportToRDB dp = new ExportToRDB(this.spark, this.timeType, this.timeID, this.backDate, "oracle", this.timeType);
         dp.dpD();
         dp.release();
     }
@@ -84,14 +89,14 @@ class Dispatch {
                     break;
             }
         } catch (Exception e) {
-            logger.error(e.toString(), e);
+            this.logger.error(e.toString(), e);
         } finally {
             this.spark.stop();
-            logger.info("timeID={} appName={} time taken {} s", timeID, appName, Duration.between(start, LocalDateTime.now()).getSeconds());
+            this.logger.info("timeID={} appName={} time taken {} s", timeID, appName, Duration.between(start, LocalDateTime.now()).getSeconds());
         }
     }
 
     public void startLog(String appName) {
-        logger.info("timeID={} appName={} start", timeID, appName);
+        this.logger.info("timeID={} appName={} start", timeID, appName);
     }
 }

@@ -19,6 +19,9 @@ https://github.com/wuda0112/mysql-tester
 java -jar mysql-tester-1.0.1.jar --mysql-username=test --mysql-password=Test123! --user-count=100000 --max-item-per-user=100 --thread=10 --mysql-url=jdbc:mysql://127.0.0.1:3306/?serverTimezone=UTC&characterEncoding=UTF-8 
 
 ## 调用
-spark-submit --master yarn --class etl.App --driver-memory 512m --executor-memory 512m /dp/bin/etl.jar
+spark-submit --master yarn --class etl.App --driver-memory 512m --executor-memory 512m /dp/bin/etl.jar prod 1 2020-03-23
 ### idea远程调试
-spark-submit --master yarn --class etl.App --driver-memory 512m --executor-memory 512m --driver-java-options "-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005" /dp/bin/etl.jar
+spark-submit --master yarn --class etl.App --driver-memory 512m --executor-memory 512m --driver-java-options "-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005" /dp/bin/etl.jar  prod 1 2020-03-23
+
+## 具体使用方式见
+[SparkETL 用Spark SQL实现ETL](https://blog.csdn.net/dazheng/article/details/105370358)

@@ -48,28 +48,31 @@ public class ETL extends Time {
     private Map<String, String> decideByType(@NotNull String line, Integer type) {
         String lineLower = line.toLowerCase();
         Map<String, String> map = new HashMap<String, String>();
-        if (type == 1) { // spark平台常规执行
-            if (lineLower.contains(" local directory ")) { // 写入目录
-                map.put(this.isOrNot, this.is);
-                map.put("line", line.split("'")[1]);
-                return map;
-            }
-        } else if (type == 2) { // 导入其他RDBMS数据或者生成临时视图
-            if (lineLower.substring(0, 7).equals("insert ")) {
-                map.put(this.isOrNot, this.is);
-                map.put("line", line);
-                return map;
-            } else if (lineLower.startsWith("@")) { // 临时视图名称
-                map.put(this.isOrNot, this.is);
-                map.put("line", line.substring(1).trim());
-                return map;
-            }
-        } else if (type == 3) {  // 导出数据到其他RDBMS
-            if (lineLower.startsWith("@")) {
-                map.put(this.isOrNot, this.is);
-                map.put("line", line.substring(1).trim());
-                return map;
-            }
+        switch (type) {
+            case 1:  // spark平台常规执行
+                if (lineLower.contains(" local directory ")) { // 写入目录
+                    map.put(this.isOrNot, this.is);
+                    map.put("line", line.split("'")[1]);
+                    return map;
+                }
+                break;
+            case 2: // 导入其他RDBMS数据或者生成临时视图
+                if (lineLower.substring(0, 7).equals("insert ")) {
+                    map.put(this.isOrNot, this.is);
+                    map.put("line", line);
+                    return map;
+                } else if (lineLower.startsWith("@")) { // 临时视图名称
+                    map.put(this.isOrNot, this.is);
+                    map.put("line", line.substring(1).trim());
+                    return map;
+                }
+            case 3:  // 导出数据到其他RDBMS
+                if (lineLower.startsWith("@")) {
+                    map.put(this.isOrNot, this.is);
+                    map.put("line", line.substring(1).trim());
+                    return map;
+                }
+                break;
         }
         map.put(this.isOrNot, this.not);
         map.put("line", "");
@@ -169,8 +172,8 @@ public class ETL extends Time {
      */
     Dataset<Row> exeSQL(String sql) {
         LocalDateTime start = LocalDateTime.now();
-        logger.info(Public.getMinusSep());
-        logger.info(sql);
+        this.logger.info(Public.getMinusSep());
+        this.logger.info(sql);
         Dataset<Row> df = spark.sql(sql);
         Public.printDuration(start, LocalDateTime.now());
         return df;
@@ -187,7 +190,7 @@ public class ETL extends Time {
         FileSystem fileSystem = null;  //操作Hdfs核心类
         Configuration configuration = null;  //配置类
         Toml toml = Public.getParameters();
-        String HDFS_PATH = toml.getTable("base").getString("hdfs_path");
+        String HDFS_PATH = toml.getTable("base").getString("hdfs_path", "hdfs://master");
         try {
             String hdfsDir = "/tmp/" + localDir.substring(localDir.indexOf("/"));
             df.coalesce(8).write().mode("overwrite").option("sep", Public.getColumnDelimiter()).csv(hdfsDir);
@@ -197,8 +200,6 @@ public class ETL extends Time {
             configuration.set("fs.defaultFS", HDFS_PATH);
             fileSystem = FileSystem.get(configuration);
             fileSystem.copyToLocalFile(new Path(hdfsDir), new Path(localDir));
-//        } catch (Exception e) {
-//            logger.error(e.toString(), e);
         } finally {
             if (configuration != null) {
                 configuration.clear();

@@ -29,7 +29,7 @@ public class Transform extends ETL {
      *
      * @param tables 表名列表
      */
-    public void dropHivePartition(List<String> tables) {
+    public void dropHivePartition(List<String> tables) throws Exception {
         for (String t : tables) {
             String start = getStartTimeID();
             String end = getEndTimeID();
@@ -68,10 +68,13 @@ public class Transform extends ETL {
     protected void exeSQLFile(String fileName, String exeType) throws Exception {
         String sqls = Public.readSqlFile(getTransformSqlDir() + fileName);
         exeType = exeType.toLowerCase();
-        if (exeType.equals("insert")) {
+        if ("insert".equals(exeType)) {
             exeSQLs(sqls, Public.rethrowBiConsumer(this::exeSQL), 1);
-        } else if (exeType.equals("view")) {
+        } else if ("view".equals(exeType)) {
             exeSQLs(sqls, this::sqlToSpecialView, 2);
+        } else {
+            this.logger.error("not support {}", exeType);
+            throw new Exception("not support " + exeType);
         }
     }
 }

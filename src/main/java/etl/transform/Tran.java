@@ -17,7 +17,7 @@ public class Tran extends Transform {
      * @throws Exception
      */
     public void s2iD() throws Exception {
-        exeSQLFile("s2i_d.sql", "insert");
+        exeSQLFile("s2i_d.sql", "insert");  // exeType: insert 插入hive表中; view 生成v_${表名}的临时试图，供后续使用
     }
 
     /**

@@ -58,7 +58,7 @@ public class Export extends ETL {
      * @param table
      * @param sql
      */
-    private void sql2RDBTable(String table, String sql) {
+    private void sqlToRDBTable(String table, String sql) {
         Dataset<Row> df = exeSQL(sql);
         this.db.jdbcWrite(df, table);
     }
@@ -72,7 +72,7 @@ public class Export extends ETL {
      */
     private void toRDBTableIncreate(String table, String sql) throws SQLException {
         deleteRDBTable(table);
-        sql2RDBTable(table, sql);
+        sqlToRDBTable(table, sql);
     }
 
     /**
@@ -84,7 +84,7 @@ public class Export extends ETL {
      */
     private void toRDBTableFull(String table, String sql) throws SQLException {
         this.db.exeSQL("truncate table " + table);
-        sql2RDBTable(table, sql);
+        sqlToRDBTable(table, sql);
     }
 
     /**
@@ -109,7 +109,7 @@ public class Export extends ETL {
         if (table == null || table.isEmpty()) {
             this.db.exeSQL(sql);
         } else {
-            sql2RDBTable(table, sql);
+            sqlToRDBTable(table, sql);
         }
     }
 
@@ -122,7 +122,7 @@ public class Export extends ETL {
      * @throws IOException
      * @throws InterruptedException
      */
-    private void exeLoadSQL(String table, String sql) throws SQLException, IOException, InterruptedException {
+    private void exeLoadSQL(String table, String sql) throws Exception {
         if (table == null || table.isEmpty()) {
             this.db.exeSQL(sql);
         } else {
@@ -145,13 +145,15 @@ public class Export extends ETL {
                     this.db.SQLServerLoad(table, files);
                     break;
                 case "postgresql":
-                    this.db.PostgreSQLLoad(table, files);
+//                    this.db.PostgreSQLLoad(table, files); // TODO：合适的laod方式
+                    this.db.jdbcWrite(df, table);
                     break;
                 case "db2":
                     this.db.DB2Load(table, files);
                     break;
                 default:
-                    logger.error("not support {}", this.db.getDbType());
+                    this.logger.error("not support {}", this.db.getDbType());
+                    throw new Exception("not support " + this.db.getDbType());
             }
         }
     }
@@ -176,6 +178,8 @@ public class Export extends ETL {
             case "db":
                 exeSQLs(sqls, Public.rethrowBiConsumer(this::exeRDBSQL), 1);
                 break;
+            default:
+                this.logger.error("not suport {}", exeType);
         }
     }
 
@@ -187,7 +191,7 @@ public class Export extends ETL {
      * @return 表名，以逗号分隔的列名字符串
      * @throws SQLException
      */
-    private Map<String, String> getRDBTableColumns(@NotNull String table) throws SQLException {
+    private Map<String, String> getRDBTableColumns(@NotNull String table) throws Exception {
         String[] nt = table.split(".");
         String nativeTable = nt.length == 2 ? nt[1] : table;
         String cs = this.db.getTableColumns(nativeTable);
@@ -206,7 +210,7 @@ public class Export extends ETL {
      * @param tables 表名列表
      * @throws SQLException
      */
-    public void simpleToRDBIncrease(@NotNull List<String> tables) throws SQLException {
+    public void simpleToRDBIncrease(@NotNull List<String> tables) throws Exception {
         for (String table : tables) {
             Map<String, String> paras = getRDBTableColumns(table);
             assert paras != null;
@@ -225,7 +229,7 @@ public class Export extends ETL {
      * @param tables 表名列表
      * @throws SQLException
      */
-    public void simpleToRDBFull(@NotNull List<String> tables) throws SQLException {
+    public void simpleToRDBFull(@NotNull List<String> tables) throws Exception {
         for (String table : tables) {
             Map<String, String> paras = getRDBTableColumns(table);
             assert paras != null;

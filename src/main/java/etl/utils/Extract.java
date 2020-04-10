@@ -1,52 +1,54 @@
 package etl.utils;
 
+import com.moandjiezana.toml.Toml;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * 从RDB中抽取数据
+ * 从数据库中抽取数据
  */
 public class Extract extends ETL {
     private final Logger logger = LoggerFactory.getLogger(Extract.class);
     private final SparkSession spark;
     private final RDB db;
+    private final MongoDB db;
+    private final Elasticsearch db;
 
     public Extract(SparkSession spark, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) throws SQLException, ClassNotFoundException {
         super(spark, timeType, timeID, backDate, frequency);
         this.spark = spark;
-        this.db = new RDB(dbID);
+        Map<String, Object> map = Public.getDB(dbID);
+        if (map != null) {
+            String type = (String) map.get("type");
+            Toml tdb = (Toml) map.get("db");
+            switch (type) {
+                case Public.DB_RDB:
+                    this.db = new RDB(tdb);
+                    break;
+                case Public.DB_MONGODB:
+                    this.db = new MongoDB(tdb);
+                    break;
+                case Public.DB_ELASTICSEARCH:
+                    this.db = new Elasticsearch(tdb);
+                    break;
+            }
+        }
     }
 
     public void release() throws SQLException {
         this.db.release();
     }
 
+
     public static String getExtractSQLDirectory() {
         return "extract/";
-    }
-
-    /**
-     * rdb的SQL生成v_table的临时视图
-     *
-     * @param table 表名
-     * @param sql   执行的SQL
-     */
-    private void exeViewSQL(String table, String sql) {
-        this.db.sqlToSpecialView(this.spark, table, sql);
-    }
-
-    /**
-     * 将执行的N个sql生成指定的临时视图
-     *
-     * @param sqls n个SQL语句内容
-     * @throws Exception
-     */
-    public void exeViewSQLs(String sqls) throws Exception {
-        exeSQLs(sqls, this::exeViewSQL, 2);
     }
 
     /**
@@ -55,10 +57,8 @@ public class Extract extends ETL {
      * @param insertSql 插入hive表的语句
      * @param querySql  查询rdb的语句
      */
-    private void exeInsertSQL(String insertSql, String querySql) {
-        this.db.sqlToView(this.spark, querySql);
-        insertSql = insertSql + " select * from v_tmp";
-        exeSQL(insertSql);
+    private void exeSQL(String insertSql, String querySql) {
+        this.db.read(this.spark, querySql);
     }
 
     /**
@@ -72,7 +72,7 @@ public class Extract extends ETL {
         String sqls = Public.readSqlFile(getExtractSQLDirectory() + fileName);
         exeType = exeType.toLowerCase();
         if ("insert".equals(exeType)) {
-            exeSQLs(sqls, this::exeInsertSQL, 2);
+            exeSQLs(sqls, this::exeSQL, 1);
         } else if ("load".equals(exeType)) {
             exeSQLs(sqls, Public.rethrowBiConsumer(this::exeLoadSQL), 2);
         } else {
@@ -99,7 +99,7 @@ public class Extract extends ETL {
         String timeType = String.valueOf(this.getTimeType());
         assert insertSQL != null;
         insertSQL = insertSQL.toLowerCase();
-        String table = getTableFromSQL(insertSQL);
+        String table = Public.getTableFromSQL(insertSQL);
         if (table == null) {
             return;
         }
@@ -107,19 +107,19 @@ public class Extract extends ETL {
 
         // 分数据库
         switch (this.db.getDbType()) {
-            case "mysql":
+            case Public.DB_MYSQL:
                 this.db.MysqlExport(sql, fileName);
                 break;
-            case "oracle":
+            case Public.DB_ORACLE:
                 this.db.OracleExport(sql, fileName);
                 break;
-            case "sqlserver":
+            case Public.DB_SQLSERVER:
                 this.db.SQLServerExport(sql, fileName, table);
                 break;
-            case "postgresql":
+            case Public.DB_POSTGRESQL:
                 this.db.PostgreSQLExport(sql, fileName);
                 break;
-            case "db2":
+            case Public.DB_DB2:
                 this.db.DB2Export(sql, fileName);
                 break;
             default:
@@ -129,23 +129,4 @@ public class Extract extends ETL {
         Public.printDuration(start, LocalDateTime.now());
         this.hiveLoad(insertSQL, fileName);
     }
-
-    /**
-     * 从插入的SQL中获取目标表名
-     *
-     * @param insertSQL 插入SQL
-     * @return 目标表名
-     */
-    private String getTableFromSQL(String insertSQL) {
-        String[] sqls = insertSQL.split(" ");
-        for (int i = 0; i < sqls.length; i++) {
-            if ("table".equals(sqls[i])) {
-                if (!sqls[i + 1].equals(" ")) {
-                    return sqls[i + 1];
-                }
-            }
-        }
-        return null;
-    }
-
 }

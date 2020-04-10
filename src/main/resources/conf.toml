@@ -6,7 +6,7 @@ hdfs_path = "hdfs://master" # hdfs
 jdbc_fetch_size = 1000 # jdbc每次读取大小
 jdbc_batch_size = 1000 # jdbc每次写入大小
 
-[[db]]
+[[rdb]]
 id = "dp"
 db_type = "mysql"
 driver_class = "com.mysql.cj.jdbc.Driver"
@@ -14,41 +14,46 @@ url = "jdbc:mysql://db:3306/mysql_tester?local_infile=1&zeroDateTimeBehavior=con
 user = "test"
 password = "Test123$"
 
-[[db]]
+[[rdb]]
 id = "oracle"
-db_type = "oracle"
 driver_class = "oracle.jdbc.driver.OracleDriver"
 url = "jdbc:oracle:thin:@//db:1521/testdb"
 user = "c##test"
 password = "Test1234"
 
-[[db]]
+[[rdb]]
 id = "sqlserver"
-db_type = "sqlserver"
 driver_class = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
 url = "jdbc:sqlserver://db:1433;DatabaseName=test"
 user = "sa"
 password = "Test123$"
 
-[[db]]
+[[rdb]]
 id = "postgresql"
-db_type = "postgresql"
 driver_class = "org.postgresql.Driver"
 url = "jdbc:postgresql://db:5432/test"
 user = "test"
 password = "Test123$"
 
-[[db]]
+[[rdb]]
 id = "db2"
-db_type = "db2"
 driver_class = "com.ibm.db2.jcc.DB2Driver"
 url = "jdbc:db2://db:50000/test"
 user = "test"
 password = "Test123$"
 
-[[db]]
+[[mongo]]
 id = "log_mongo"
-db_type = "mongodb"
-url = "mongodb://hadoop:hadoop@127.0.0.1:3717/test"
-database = "test"
+url = "mongodb://hadoop:hadoop@127.0.0.1:27017/test?readPreference=primaryPreferred"
 
+[[es]] # elaticsearch
+id = "es"
+host = "db"
+port = "9200"
+
+[[redis]]
+id = "redis"
+host = "db"
+port = "6379"
+dbNO = "0"
+auth = "Test123$"

@@ -78,8 +78,8 @@ public class Dispatch {
                     startLog(appName);
                     setSpark(appName);
                     this.backDate = 1;
-//                    extractD();
-//                    transformD();
+                    extractD();
+                    transformD();
                     exportD();
                     break;
                 case 11:

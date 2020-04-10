@@ -9,10 +9,11 @@
 * Oracle 19c
 * MySQL 8.0.19
 * SQLServer 2019 Developer
-* PostgreSQL  
-* DB2 
-* MongoDB  # TODO
-* Elasticsearch # TODO 
+* PostgreSQL 12.2  
+* DB2 11.5
+* MongoDB 4.2.5  # TODO
+* Elasticsearch 7.6.2 # TODO 
+* Redis 5.0.8 # TODO
 
 ## 数据
 https://github.com/wuda0112/mysql-tester

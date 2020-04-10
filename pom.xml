@@ -158,6 +158,18 @@
             <artifactId>jcc</artifactId>
             <version>11.5.0.0</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.elasticsearch/elasticsearch-spark-20 -->
+        <dependency>
+            <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch-spark-20_2.11</artifactId>
+            <version>7.6.2</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/com.redislabs/spark-redis -->
+        <dependency>
+            <groupId>com.redislabs</groupId>
+            <artifactId>spark-redis</artifactId>
+            <version>2.3.1</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

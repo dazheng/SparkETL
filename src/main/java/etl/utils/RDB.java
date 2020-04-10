@@ -4,6 +4,7 @@ import com.moandjiezana.toml.Toml;
 import org.apache.commons.lang.StringUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -26,23 +27,19 @@ import java.util.stream.Collectors;
  */
 public class RDB {
     private final Logger logger = LoggerFactory.getLogger(RDB.class);
-    private final String id;
     private final String driverClass;
-    private final String jdbcUrl;
+    private final String url;
     private final String user;
     private final String password;
     private final String dbType;
     private Connection conn;
 
-    RDB(String ID) throws SQLException, ClassNotFoundException {
-        this.id = ID;
-        Toml db = getRDB();
-        assert db != null;
+    RDB(Toml db) throws SQLException, ClassNotFoundException {
         this.driverClass = db.getString("driver_class");
-        this.jdbcUrl = db.getString("url");
+        this.url = db.getString("url");
         this.user = db.getString("user");
         this.password = db.getString("password");
-        this.dbType = db.getString("db_type");
+        this.dbType = new Public.JdbcUrlSplitter(this.url).driverName;
         this.conn = connection();
     }
 
@@ -57,22 +54,6 @@ public class RDB {
      */
     protected void release() throws SQLException {
         close(this.conn);
-    }
-
-    /**
-     * 获取配置文件中的rdb连接参数
-     *
-     * @return rdb连接参数
-     */
-    private Toml getRDB() {
-        Toml toml = Public.getParameters();
-        List<Toml> dbs = toml.getTables("db");
-        for (Toml db : dbs) {
-            if (db.getString("id").equals(this.id)) {
-                return db;
-            }
-        }
-        return null;
     }
 
     private void close(Connection conn) throws SQLException {
@@ -110,7 +91,7 @@ public class RDB {
     @NotNull
     private Connection connection() throws ClassNotFoundException, SQLException {
         Class.forName(this.driverClass);
-        Connection conn = DriverManager.getConnection(this.jdbcUrl, this.user, this.password);
+        Connection conn = DriverManager.getConnection(this.url, this.user, this.password);
         conn.setAutoCommit(true);
         return conn;
     }
@@ -167,7 +148,7 @@ public class RDB {
         String s = "";
 
         try {
-            String schema = new Public.JdbcUrlSplitter(this.jdbcUrl).database;
+            String schema = new Public.JdbcUrlSplitter(this.url).database;
             stmt = getConnection().prepareStatement(sql);
             if ("oracle".equals(this.dbType)) {
                 stmt.setString(1, table.toUpperCase());
@@ -217,8 +198,10 @@ public class RDB {
         }
     }
 
-    /** 调用oracle sqlldr load数据
+    /**
+     * 调用oracle sqlldr load数据
      * jdbc url需要配置成thin service方式
+     *
      * @param table 表名
      * @param files 文件名
      * @throws IOException
@@ -226,9 +209,9 @@ public class RDB {
      */
     // .ctl文件需要提前定义好,客户端安装sqlldr工具, 要求db与实例名字一致
     protected void OracleLoad(String table, List<String> files) throws IOException, InterruptedException {
-        String db = new Public.JdbcUrlSplitter(jdbcUrl).database;
-        String host = new Public.JdbcUrlSplitter(jdbcUrl).host;
-        String port = new Public.JdbcUrlSplitter(jdbcUrl).port;
+        String db = new Public.JdbcUrlSplitter(url).database;
+        String host = new Public.JdbcUrlSplitter(url).host;
+        String port = new Public.JdbcUrlSplitter(url).port;
         for (String file : files) {
             String ctlFile = Public.getConfDirectory() + table + ".ctl";
             String logDir = Public.getLogDirectory() + table + "/";
@@ -257,8 +240,8 @@ public class RDB {
      * @throws SQLException
      */
     protected void SQLServerLoad(String table, List<String> files) throws IOException, InterruptedException {
-        String db = new Public.JdbcUrlSplitter(this.jdbcUrl).database;
-        String host = new Public.JdbcUrlSplitter(this.jdbcUrl).host;
+        String db = new Public.JdbcUrlSplitter(this.url).database;
+        String host = new Public.JdbcUrlSplitter(this.url).host;
         String ctlFile = Public.getConfDirectory() + table + ".fmt";
         for (String file : files) {
 //            String sql = String.format(
@@ -302,8 +285,8 @@ public class RDB {
      * @throws InterruptedException
      */
     protected void PostgreSQLLoad(String table, List<String> files) throws IOException, InterruptedException {
-        String db = new Public.JdbcUrlSplitter(this.jdbcUrl).database;
-        String host = new Public.JdbcUrlSplitter(this.jdbcUrl).host;
+        String db = new Public.JdbcUrlSplitter(this.url).database;
+        String host = new Public.JdbcUrlSplitter(this.url).host;
         String logDir = Public.getLogDirectory() + table + "/";
         Files.createDirectories(Paths.get(logDir));
         String logFile = logDir + table + ".log";
@@ -424,10 +407,18 @@ public class RDB {
      * @param sql   SQL语句
      * @return Dataset
      */
-    protected Dataset<Row> jdbcRead(@NotNull SparkSession spark, String sql) {
-        return spark.read().format("jdbc").option("driver", this.driverClass).option("url", this.jdbcUrl)
-            .option("user", this.user).option("password", this.password).option("query", sql)
-            .option("fetchsize", Public.getParameters().getTable("base").getLong("jdbc_fetch_size", (long) 10000)).load();
+    protected void read(@NotNull SparkSession spark, String sql) {
+        LocalDateTime start = LocalDateTime.now();
+        logger.info(Public.getMinusSep());
+        logger.info(sql);
+
+        String table = "";
+        Dataset<Row> df = spark.read().format("jdbc").option("driver", this.driverClass).option("url", this.url)
+            .option("user", this.user).option("password", this.password).option("dbtable", table) // spark 支持pushDownPredicate，可以在连接指定表名，然后用spark sql操作
+            .option("fetchsize", Public.getJdbcFetchSize()).load();
+        df.createOrReplaceTempView(table);
+        spark.sql(sql);
+        Public.printDuration(start, LocalDateTime.now());
     }
 
     /**
@@ -437,51 +428,12 @@ public class RDB {
      * @param df    Dataset
      * @param table 表名
      */
-    protected void jdbcWrite(@NotNull Dataset<Row> df, String table) {
+    protected void write(@NotNull Dataset<Row> df, String table) {
         LocalDateTime start = LocalDateTime.now();
-        df.write().mode("append").format("jdbc").option("driver", this.driverClass).option("url", this.jdbcUrl)
+        df.write().mode(SaveMode.Append).format("jdbc").option("driver", this.driverClass).option("url", this.url)
             .option("user", this.user).option("password", this.password).option("dbtable", table)
-            .option("batchsize", Public.getParameters().getTable("base").getLong("jdbc_batch_size", (long) 10000)).save();
+            .option("batchsize", Public.getJdbcBatchSize()).save();
         Public.printDuration(start, LocalDateTime.now());
     }
 
-    /**
-     * 将SQL语句生成Dataset
-     *
-     * @param spark SparkSession
-     * @param sql   SQL语句
-     * @return Dataset
-     */
-    private Dataset<Row> sqlToDF(SparkSession spark, String sql) {
-        LocalDateTime start = LocalDateTime.now();
-        logger.info(Public.getMinusSep());
-        logger.info(sql);
-        Dataset<Row> df = jdbcRead(spark, sql);
-        Public.printDuration(start, LocalDateTime.now());
-        return df;
-    }
-
-    /**
-     * 将SQL语句生成临时视图
-     *
-     * @param spark SparkSession
-     * @param sql   SQL语句
-     */
-    protected void sqlToView(SparkSession spark, String sql) {
-        Dataset<Row> df = sqlToDF(spark, sql);
-        df.createOrReplaceTempView("v_tmp");
-    }
-
-
-    /**
-     * 将SQL生成指定名称的临时视图
-     *
-     * @param spark SparkSession
-     * @param table 表名
-     * @param sql   sql语句
-     */
-    protected void sqlToSpecialView(SparkSession spark, String table, String sql) {
-        Dataset<Row> df = sqlToDF(spark, sql);
-        df.createOrReplaceTempView("v_" + table);
-    }
 }

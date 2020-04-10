@@ -227,7 +227,7 @@ public class ETL extends Time {
      * @param insertSQL SQL语句
      * @param file      文件
      */
-    protected void hiveLoad(String insertSQL, String file) {
+    void hiveLoad(String insertSQL, String file) {
         String sql = String.format("load data local inpath '%s' %s ", file, getHiveLoad(insertSQL));
         exeSQL(sql);
     }

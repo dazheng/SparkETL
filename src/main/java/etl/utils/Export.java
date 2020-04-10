@@ -15,7 +15,7 @@ import java.util.Map;
 
 
 /**
- * 将spark结算结果同步到RDBMS中
+ * 将spark计算结果同步到数据库中
  */
 public class Export extends ETL {
     private final Logger logger = LoggerFactory.getLogger(Export.class);
@@ -60,7 +60,7 @@ public class Export extends ETL {
      */
     private void sqlToRDBTable(String table, String sql) {
         Dataset<Row> df = exeSQL(sql);
-        this.db.jdbcWrite(df, table);
+        this.db.write(df, table);
     }
 
     /**
@@ -135,20 +135,20 @@ public class Export extends ETL {
             }
 
             switch (this.db.getDbType()) {
-                case "mysql":
+                case Public.DB_MYSQL:
                     this.db.MySQLLoad(table, files);
                     break;
-                case "oracle":
+                case Public.DB_ORACLE:
                     this.db.OracleLoad(table, files);
                     break;
-                case "sqlserver":
+                case Public.DB_SQLSERVER:
                     this.db.SQLServerLoad(table, files);
                     break;
-                case "postgresql":
+                case Public.DB_POSTGRESQL:
 //                    this.db.PostgreSQLLoad(table, files); // TODO：合适的laod方式
-                    this.db.jdbcWrite(df, table);
+                    this.db.write(df, table);
                     break;
-                case "db2":
+                case Public.DB_DB2:
                     this.db.DB2Load(table, files);
                     break;
                 default:

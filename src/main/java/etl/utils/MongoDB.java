@@ -1,46 +1,34 @@
 package etl.utils;
 
 import com.moandjiezana.toml.Toml;
-import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.spark.MongoSpark;
+import com.mongodb.spark.config.ReadConfig;
+import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.mongodb.client.model.Filters.*;
-import static com.mongodb.client.model.Projections.*;
-
-import com.mongodb.spark.MongoSpark;
-
-import java.util.List;
-
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import org.bson.Document;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MongoDB {
     private final Logger logger = LoggerFactory.getLogger(RDB.class);
-    private final String id;
-    private final String driverClass;
-    private final String ConnectioncUrl;
-    private final String user;
-    private final String password;
+    private final String url;
     private final String dbType;
     private MongoClient conn;
 
 
-    MongoDB(String ID) {
-        this.id = ID;
-        Toml db = getRDB();
+    MongoDB(Toml db) {
         assert db != null;
-        this.driverClass = db.getString("driver_class");
-        this.ConnectioncUrl = db.getString("url");
-        this.user = db.getString("user");
-        this.password = db.getString("password");
-        this.dbType = db.getString("db_type");
+        this.url = db.getString("url");
+        this.dbType = Public.DB_MONGODB;
         this.conn = connection();
     }
 
@@ -55,7 +43,7 @@ public class MongoDB {
     private MongoClient connection() {
         MongoClient mongoClient = null;
         try {
-            mongoClient = MongoClients.create(this.ConnectioncUrl);
+            mongoClient = MongoClients.create(this.url);
         } catch (Exception e) {
             logger.error(e.toString(), e);
         }
@@ -66,42 +54,48 @@ public class MongoDB {
         return this.conn;
     }
 
-    private Toml getRDB() {
-        Toml toml = Public.getParameters();
-        List<Toml> dbs = toml.getTables("db");
-        for (Toml db : dbs) {
-            if (db.getString("id").equals(this.id)) {
-                return db;
-            }
-        }
-        return null;
+    /**
+     * 根据time_type\time_id删除数据
+     *
+     * @param table
+     */
+    public void delete(String table) {
+
     }
 
-    protected void MongoDBExport(String query, String fileName) {
-        String collection = getCollectionFromSQL(query);
-        String db = getDBFromURl();
-        MongoCollection<Document> coll = getConnection().getDatabase(db).getCollection(collection);
-        coll.find().projection(fields(include("name", "stars", "categories"), excludeId()));
+    /**
+     * 参考：https://docs.mongodb.com/spark-connector/master/configuration/
+     *
+     * @param spark
+     * @param sql
+     */
+    public void read(@NotNull SparkSession spark, String sql) {
+        String table = Public.getTableFromSQL(sql);
+        JavaSparkContext jsc = createJavaSparkContext(this.url);
+        Map<String, String> readOverrides = new HashMap<String, String>();
+        readOverrides.put("collection", table);
+        readOverrides.put("batchSize", String.valueOf(Public.getJdbcFetchSize()));
+        ReadConfig readConfig = ReadConfig.create(jsc).withOptions(readOverrides);
+        Dataset<Row> explicitDF = MongoSpark.load(jsc, readConfig).toDF();
+        explicitDF.createOrReplaceTempView(table);
+        spark.sql(sql);
     }
 
-    private String getCollectionFromSQL(String sql) {
-        return "";
+    /**
+     * TODO：如何删除重复数据？
+     *
+     * @param df
+     * @param table
+     */
+    protected void write(@NotNull Dataset<Row> df, String table) {
+        MongoSpark.write(df).mode(SaveMode.Append).option("collection", table).option("maxBatchSize", Public.getJdbcBatchSize()).save();
     }
 
-    private String[] getColumnsFromSQL(String sql) {
-        return null;
-    }
-
-    private String getWhereFromSQL(String sql) {
-        return "";
-    }
-
-    private String getDBFromURl() {
-        return "";
-    }
-
-    protected void MongoDBWrite(@NotNull Dataset<Row> df, String table) {
-        MongoSpark.write(df).option("collection", table).mode("overwrite").save();
+    private static JavaSparkContext createJavaSparkContext(String uri) {
+        SparkConf conf = new SparkConf()
+            .set("spark.mongodb.input.uri", uri)
+            .set("spark.mongodb.output.uri", uri);
+        return new JavaSparkContext(conf);
     }
 }
 

@@ -9,8 +9,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Objects;
-import java.util.Properties;
+import java.util.*;
 import java.util.function.BiConsumer;
 
 /**
@@ -25,7 +24,16 @@ public class Public {
     static final Properties PROPERTIES = new Properties(System.getProperties());
     private final static String LineDelimiter = PROPERTIES.getProperty("line.separator"); // 操作系统换行符
     private final static String FileDelimiter = PROPERTIES.getProperty("file.separator"); // 操作系统路径分隔符
-
+    final static String[] TOML_DB_TABLE = {"rdb", "mongo", "es", "redis"};
+    final static String DB_RDB = "rdb";
+    final static String DB_ORACLE = "oracle";
+    final static String DB_MYSQL = "mysql";
+    final static String DB_SQLSERVER = "sqlserver";
+    final static String DB_POSTGRESQL = "postgresql";
+    final static String DB_DB2 = "db2";
+    final static String DB_MONGODB = "mongo";
+    final static String DB_ELASTICSEARCH = "es";
+    final static String DB_REDIS = "redis";
     private static Toml toml = parseParameters(); // 获取解析后的toml配置文件
 
     static String getMinusSep() {
@@ -55,23 +63,23 @@ public class Public {
         return FileDelimiter;
     }
 
-    static void printDuration(LocalDateTime start, LocalDateTime end) {
+    public static void printDuration(LocalDateTime start, LocalDateTime end) {
         logger.info("time taken {} s", Duration.between(start, end).getSeconds());
     }
 
-    public static String getDataDirectory() {
+    protected static String getDataDirectory() {
         return toml.getTable("base").getString("data_dir");
     }
 
-    public static String getLogDirectory() {
+    protected static String getLogDirectory() {
         return toml.getTable("base").getString("log_dir");
     }
 
-    public static String getConfDirectory() {
+    protected static String getConfDirectory() {
         return toml.getTable("base").getString("conf_dir");
     }
 
-    public static String getTableDataDirectory(String table, String timeType) {
+    protected static String getTableDataDirectory(String table, String timeType) {
         return getDataDirectory() + table + "/" + timeType + "/";
     }
 
@@ -110,6 +118,39 @@ public class Public {
         return toml;
     }
 
+    /**
+     * jdbc 获取数据时每批次记录条数
+     *
+     * @return 记录条数
+     */
+    static long getJdbcFetchSize() {
+        return getParameters().getTable("base").getLong("jdbc_fetch_size", (long) 10000);
+    }
+
+    /**
+     * jdbc 写入数据时每批次记录条数
+     *
+     * @return 记录条数
+     */
+    static long getJdbcBatchSize() {
+        return getParameters().getTable("base").getLong("jdbc_batch_size", (long) 10000);
+    }
+
+    static Map<String, Object> getDB(String dbID) {
+        Toml toml = getParameters();
+        Map<String, Object> map = new HashMap<>();
+        for (String table : TOML_DB_TABLE) {
+            List<Toml> dbs = toml.getTables(table);
+            for (Toml db : dbs) {
+                if (db.getString("id").equals(dbID)) {
+                    map.put("type", table);
+                    map.put("db", db);
+                    return map;
+                }
+            }
+        }
+        return null;
+    }
 
     /**
      * 递归删除目录先的所有文件及目录
@@ -117,7 +158,7 @@ public class Public {
      * @param dir 目录
      * @return 是否成功
      */
-    public static boolean deleteDirectory(File dir) {
+    static boolean deleteDirectory(File dir) {
         if (dir.isDirectory()) {
             String[] children = dir.list();
             assert children != null;
@@ -136,13 +177,31 @@ public class Public {
     }
 
     /**
+     * 从insert overwrite[into] table的SQL中获取目标表名
+     *
+     * @param insertSQL 插入SQL
+     * @return 目标表名
+     */
+    static String getTableFromSQL(String insertSQL) {
+        String[] sqls = insertSQL.split(" ");
+        for (int i = 0; i < sqls.length; i++) {
+            if ("table".equals(sqls[i])) {
+                if (!sqls[i + 1].equals(" ")) {
+                    return sqls[i + 1];
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
      * 执行命令行
      *
      * @param cmd 命令
      * @throws InterruptedException
      * @throws IOException
      */
-    public static void exeCmd(String cmd) throws InterruptedException, IOException {
+    static void exeCmd(String cmd) throws InterruptedException, IOException {
         logger.info(Public.getMinusSep());
         logger.info(cmd);
         Process p = Runtime.getRuntime().exec(cmd);
@@ -169,11 +228,11 @@ public class Public {
      * @param <E>
      */
     @FunctionalInterface
-    public interface BiConsumerWithExceptions<T, U, E extends Exception> {
+    interface BiConsumerWithExceptions<T, U, E extends Exception> {
         void accept(T t, U u) throws E;
     }
 
-    public static <T, U, E extends Exception> BiConsumer<T, U> rethrowBiConsumer(BiConsumerWithExceptions<T, U, E> biConsumer) throws E {
+    static <T, U, E extends Exception> BiConsumer<T, U> rethrowBiConsumer(BiConsumerWithExceptions<T, U, E> biConsumer) throws E {
         return (t, u) -> {
             try {
                 biConsumer.accept(t, u);
@@ -184,7 +243,7 @@ public class Public {
     }
 
 
-    public static class JdbcUrlSplitter {
+    static class JdbcUrlSplitter {
         public String driverName, host, port, database, params;
 
         public JdbcUrlSplitter(String jdbcUrl) {

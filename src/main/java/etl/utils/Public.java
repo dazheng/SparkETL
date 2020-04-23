@@ -11,6 +11,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 公用的功能
@@ -24,8 +26,7 @@ public class Public {
     static final Properties PROPERTIES = new Properties(System.getProperties());
     private final static String LineDelimiter = PROPERTIES.getProperty("line.separator"); // 操作系统换行符
     private final static String FileDelimiter = PROPERTIES.getProperty("file.separator"); // 操作系统路径分隔符
-    final static String[] TOML_DB_TABLE = {"rdb", "mongo", "es", "redis"};
-    final static String DB_RDB = "rdb";
+    final static String DB_Rdb = "rdb";
     final static String DB_ORACLE = "oracle";
     final static String DB_MYSQL = "mysql";
     final static String DB_SQLSERVER = "sqlserver";
@@ -34,6 +35,8 @@ public class Public {
     final static String DB_MONGODB = "mongo";
     final static String DB_ELASTICSEARCH = "es";
     final static String DB_REDIS = "redis";
+    final static String DB_KUDU = "kudu";
+    final static String[] TOML_DB_TABLE = {DB_Rdb, DB_MONGODB, DB_ELASTICSEARCH, DB_REDIS, DB_KUDU};
     private static Toml toml = parseParameters(); // 获取解析后的toml配置文件
 
     static String getMinusSep() {
@@ -48,7 +51,7 @@ public class Public {
         return DEFAULT_COL_DELIMITER;
     }
 
-    public static String getColumnDelimiterRDB() {
+    public static String getColumnDelimiterRdb() {
         if (getColumnDelimiter().equals("\u0001")) {
             return "x'01'";
         }
@@ -97,8 +100,11 @@ public class Public {
             new BufferedReader(new InputStreamReader(Objects.requireNonNull(App.class.getClassLoader().getResourceAsStream(fileName))));
         sb = new StringBuilder();
         String line;
+        Pattern p = Pattern.compile("\\s+");
         while ((line = in.readLine()) != null) {
             line = line.trim().replace("\r\n", getOSLineDelimiter());
+            Matcher m = p.matcher(line);
+            line = m.replaceAll(" ");
             if (line.length() > 0) {
                 sb.append(line);
                 sb.append(getOSLineDelimiter());
@@ -136,6 +142,12 @@ public class Public {
         return getParameters().getTable("base").getLong("jdbc_batch_size", (long) 10000);
     }
 
+    /**
+     * 获取配置文件中dbID对应的toml信息
+     *
+     * @param dbID db标识符
+     * @return db对应的toml信息
+     */
     static Map<String, Object> getDB(String dbID) {
         Toml toml = getParameters();
         Map<String, Object> map = new HashMap<>();
@@ -177,12 +189,31 @@ public class Public {
     }
 
     /**
+     * 从单表查询语句中获得表名
+     *
+     * @param sql 查询SQL
+     * @return 表名
+     */
+    static String getTableFromSelectSQL(String sql) {
+        sql = sql.toLowerCase();
+        int index = sql.indexOf("from ");
+        sql = sql.substring(index + 5);
+        Pattern p = Pattern.compile("\\s+");
+        Matcher m = p.matcher(sql);
+        if (!m.find()) {
+            return sql;
+        }
+        index = m.start();
+        return sql.substring(0, index);
+    }
+
+    /**
      * 从insert overwrite[into] table的SQL中获取目标表名
      *
      * @param insertSQL 插入SQL
      * @return 目标表名
      */
-    static String getTableFromSQL(String insertSQL) {
+    static String getTableFromInsertSQL(String insertSQL) {
         String[] sqls = insertSQL.split(" ");
         for (int i = 0; i < sqls.length; i++) {
             if ("table".equals(sqls[i])) {
@@ -243,7 +274,7 @@ public class Public {
     }
 
 
-    static class JdbcUrlSplitter {
+    public static class JdbcUrlSplitter {
         public String driverName, host, port, database, params;
 
         public JdbcUrlSplitter(String jdbcUrl) {
@@ -267,7 +298,7 @@ public class Public {
                     connUri = connUri.substring(6);
                 }
                 if (driverName.equals("sqlserver")) {
-                    String[] parmsArray = params.split("&");
+                    String[] parmsArray = params.split(";");
                     for (String p : parmsArray) {
                         String[] ps = p.split("=");
                         if (ps.length < 2) {
@@ -286,6 +317,10 @@ public class Public {
                 } else if ((pos = connUri.indexOf('/', 2)) != -1) {
                     host = connUri.substring(2, pos);
                     database = connUri.substring(pos + 1);
+                    int index = database.indexOf("?");
+                    if (index != -1) {
+                        database = database.substring(0, index);
+                    }
 
                     if ((pos = host.indexOf(':')) != -1) {
                         port = host.substring(pos + 1);
@@ -293,7 +328,7 @@ public class Public {
                     }
                 }
             } else {
-                database = connUri;
+                database = connUri.substring(0, connUri.indexOf("?"));
             }
         }
     }

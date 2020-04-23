@@ -17,6 +17,7 @@ buildNumber.properties
 *.iml
 .idea/*
 !.idea/runConfigurations/
+.idea/
 
 #
 # Visual Studio Code

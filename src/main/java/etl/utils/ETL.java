@@ -56,7 +56,7 @@ public class ETL extends Time {
                     return map;
                 }
                 break;
-            case 2: // 导入其他RDBMS数据或者生成临时视图
+            case 2: // 导入其他RdbMS数据或者生成临时视图
                 if (lineLower.substring(0, 7).equals("insert ")) {
                     map.put(this.isOrNot, this.is);
                     map.put("line", line);
@@ -66,7 +66,7 @@ public class ETL extends Time {
                     map.put("line", line.substring(1).trim());
                     return map;
                 }
-            case 3:  // 导出数据到其他RDBMS
+            case 3:  // 导出数据到其他RdbMS
                 if (lineLower.startsWith("@")) {
                     map.put(this.isOrNot, this.is);
                     map.put("line", line.substring(1).trim());

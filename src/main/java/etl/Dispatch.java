@@ -1,7 +1,7 @@
 package etl;
 
-import etl.export.ExportToRDB;
-import etl.extract.ExtractFromRDB;
+import etl.export.ExportToDBDaily;
+import etl.extract.ExtractFromDBDaily;
 import etl.transform.Tran;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -32,7 +32,7 @@ public class Dispatch {
      * @throws Exception
      */
     private void extractD() throws Exception {
-        ExtractFromRDB dp = new ExtractFromRDB(this.spark, this.timeType, this.timeID, this.backDate, "oracle", this.timeType);
+        ExtractFromDBDaily dp = new ExtractFromDBDaily(this.spark, this.timeType, this.timeID, this.backDate, "mysql", this.timeType);
         dp.dpFull();
         dp.release();
     }
@@ -56,7 +56,7 @@ public class Dispatch {
      * @throws Exception
      */
     private void exportD() throws Exception {
-        ExportToRDB dp = new ExportToRDB(this.spark, this.timeType, this.timeID, this.backDate, "oracle", this.timeType);
+        ExportToDBDaily dp = new ExportToDBDaily(this.spark, this.timeType, this.timeID, this.backDate, "mysql", this.timeType);
         dp.dpD();
         dp.release();
     }
@@ -78,8 +78,8 @@ public class Dispatch {
                     startLog(appName);
                     setSpark(appName);
                     this.backDate = 1;
-                    extractD();
-                    transformD();
+//                    extractD();
+//                    transformD();
                     exportD();
                     break;
                 case 11:

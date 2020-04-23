@@ -10,8 +10,13 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Elasticsearch {
-    private final Logger logger = LoggerFactory.getLogger(RDB.class);
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.function.BiConsumer;
+
+public class Elasticsearch implements DB {
+    private final Logger logger = LoggerFactory.getLogger(Rdb.class);
     private final String host;
     private final String port;
     private final String dbType;
@@ -23,11 +28,8 @@ public class Elasticsearch {
         this.dbType = "es";
     }
 
-    protected String getDbType() {
-        return this.dbType;
-    }
-
-    protected void release() {
+    @Override
+    public void release() {
         this.conn.close();
     }
 
@@ -48,8 +50,12 @@ public class Elasticsearch {
      * @param sql
      * @return
      */
+    @Override
     public void read(@NotNull SparkSession spark, String sql) {
-        String table = Public.getTableFromSQL(sql);
+        String table = Public.getTableFromSelectSQL(sql);
+        if ("".equals(table)) {
+            return;
+        }
         Dataset<Row> df = spark.read().format("org.elasticsearch.spark.sql").option("es.nodes", this.host)
             .option("es.port", this.port).option("pushdown", true).load(table + "/_doc"); // { "query" : { "term" : { "user" : "costinl" } } }
         df.createOrReplaceTempView(table);
@@ -63,10 +69,40 @@ public class Elasticsearch {
      * @param df
      * @param table
      */
+    @Override
     public void write(@NotNull Dataset<Row> df, String table) {
 //        df.write().format("org.elasticsearch.spark.sql").option("es.nodes", host).option("es.port", this.port).mode("append").save(type + "/" + table);
         JavaEsSparkSQL.saveToEs(df, table + "/_doc");
     }
 
+    @Override
+    public String getTableColumns(String table) throws Exception {
+        return "";
+    }
+
+    @Override
+    public BiConsumer<String, List<String>> getLoad() throws Exception {
+        return null;
+    }
+
+    @Override
+    public BiConsumer<String, String> getExport() throws Exception {
+        return null;
+    }
+
+    /**
+     * 执行插入的SQL
+     *
+     * @param sql
+     * @throws SQLException
+     */
+    @Override
+    public void exeSQL(String sql) throws SQLException {
+        LocalDateTime start = LocalDateTime.now();
+        this.logger.info(Public.getMinusSep());
+        this.logger.info(sql);
+
+        Public.printDuration(start, LocalDateTime.now());
+    }
 
 }

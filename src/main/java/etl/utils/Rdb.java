@@ -10,49 +10,54 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.*;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.function.BiConsumer;
 
 
 /**
- * 对rdbms的处理
+ * 对Rdbms的处理
  */
-public class RDB {
-    private final Logger logger = LoggerFactory.getLogger(RDB.class);
+public class Rdb implements DB {
+    private final Logger logger = LoggerFactory.getLogger(Rdb.class);
     private final String driverClass;
     private final String url;
     private final String user;
     private final String password;
     private final String dbType;
     private Connection conn;
+    private Map<String, BiConsumer> dbLoads;
+    private Map<String, BiConsumer> dbExports;
 
-    RDB(Toml db) throws SQLException, ClassNotFoundException {
+    Rdb(Toml db) throws Exception {
         this.driverClass = db.getString("driver_class");
         this.url = db.getString("url");
         this.user = db.getString("user");
         this.password = db.getString("password");
         this.dbType = new Public.JdbcUrlSplitter(this.url).driverName;
         this.conn = connection();
+        RdbLoads();
+        RdbExports();
     }
 
-    protected String getDbType() {
-        return this.dbType;
-    }
 
     /**
      * 释放申请的资源
      *
      * @throws SQLException
      */
-    protected void release() throws SQLException {
+    @Override
+    public void release() throws SQLException {
         close(this.conn);
     }
 
@@ -102,7 +107,8 @@ public class RDB {
      * @param sql
      * @throws SQLException
      */
-    void exeSQL(String sql) throws SQLException {
+    @Override
+    public void exeSQL(String sql) throws SQLException {
         LocalDateTime start = LocalDateTime.now();
         this.logger.info(Public.getMinusSep());
         this.logger.info(sql);
@@ -120,23 +126,23 @@ public class RDB {
      * @return 以逗号分隔的表字段字符串
      * @throws SQLException
      */
-    String getTableColumns(String table) throws Exception {
-
+    @Override
+    public String getTableColumns(String table) throws Exception {
         String sql = "";
         switch (this.dbType) {
-            case "mysql":
+            case Public.DB_MYSQL:
                 sql = "select column_name from information_schema.columns where table_schema = ? and table_name = ? order by ordinal_position";
                 break;
-            case "oracle":  // TODO: 排序
+            case Public.DB_ORACLE:
                 sql = "select column_name from user_tab_columns where table_name = ? order by column_id";
                 break;
-            case "sqlserver":
+            case Public.DB_SQLSERVER:
                 sql = "select column_name from information_schema.columns where table_catalog = ? and table_name = ? order by ordinal_position";
                 break;
-            case "postgresql":
+            case Public.DB_POSTGRESQL:
                 sql = "select column_name from information_schema.columns where table_catalog = ? and table_name = ? order by ordinal_position";
                 break;
-            case "db2":
+            case Public.DB_DB2:
                 sql = "SELECT colname column_name from syscat.columns where tabschema = ? and tabname = ? order by colno";
             default:
                 this.logger.error("not support {}", this.dbType);
@@ -174,26 +180,152 @@ public class RDB {
         return s;
     }
 
-    /**
-     * 获取要导入表的文件名
-     *
-     * @param table    表名
-     * @param timeType 时间类型
-     * @return 文件名列表
-     * @throws IOException
-     */
-    protected List<String> getLoadFiles(String table, String timeType) throws IOException {
-        String dir = Public.getTableDataDirectory(table, timeType);
-        return Files.list(Paths.get(dir)).map(Path::toFile)
-            .filter(file -> file.isFile() && !file.isHidden() && file.length() > 0).map(File::getAbsolutePath)
-            .collect(Collectors.toList());
+    private boolean deleteDirectoryData(String fileName) throws IOException {
+        Path path = Paths.get(fileName);
+        Files.deleteIfExists(path); // 删除数据
+        Files.createDirectories(path.getParent());
+        Files.createFile(path);
+        return true;
     }
+
+    /**
+     * spark jdbc接口方式获取SQL执行结果
+     *
+     * @param spark SparkSession
+     * @param sql   SQL语句
+     * @return Dataset
+     */
+    @Override
+    public void read(@NotNull SparkSession spark, String sql) {
+        LocalDateTime start = LocalDateTime.now();
+        logger.info(Public.getMinusSep());
+        logger.info(sql);
+
+        String table = Public.getTableFromSelectSQL(sql);
+        if ("".equals(table)) {
+            return;
+        }
+        Dataset<Row> df = spark.read().format("jdbc").option("driver", this.driverClass).option("url", this.url)
+            .option("user", this.user).option("password", this.password).option("dbtable", table) // spark 支持pushDownPredicate，可以在连接指定表名，然后用spark sql操作
+            .option("fetchsize", Public.getJdbcFetchSize()).load();
+        df.createOrReplaceTempView(table);
+        spark.sql(sql);
+        Public.printDuration(start, LocalDateTime.now());
+    }
+
+    /**
+     * spark jdbc接口方式将df结果保存到Rdb表中
+     * 在psotgresql中，原表与目标表的字段类型需要一致。已返现hive字段tinyint，postgresql smallint报 Unsupported type in postgresql: ByteType。
+     *
+     * @param df    Dataset
+     * @param table 表名
+     */
+    @Override
+    public void write(@NotNull Dataset<Row> df, String table) {
+        LocalDateTime start = LocalDateTime.now();
+        df.write().mode(SaveMode.Append).format("jdbc").option("driver", this.driverClass).option("url", this.url)
+            .option("user", this.user).option("password", this.password).option("dbtable", table)
+            .option("batchsize", Public.getJdbcBatchSize()).save();
+        Public.printDuration(start, LocalDateTime.now());
+    }
+
+    private void RdbLoads() throws Exception {
+        this.dbLoads = new HashMap<>();
+        this.dbLoads.put(Public.DB_MYSQL, Public.rethrowBiConsumer(this::MySQLLoad));
+        this.dbLoads.put(Public.DB_ORACLE, Public.rethrowBiConsumer(this::OracleLoad));
+        this.dbLoads.put(Public.DB_SQLSERVER, Public.rethrowBiConsumer(this::SQLServerLoad));
+//        this.dbLoads.put(Public.DB_POSTGRESQL, Public.rethrowBiConsumer(this::PostgreSQLLoad));
+        this.dbLoads.put(Public.DB_DB2, Public.rethrowBiConsumer(this::DB2Load));
+    }
+
+    @Override
+    public BiConsumer getLoad() throws Exception {
+        return this.dbLoads.getOrDefault(this.dbType, Public.rethrowBiConsumer(this::fileToRdbByJdbc));
+    }
+
+    private void RdbExports() throws Exception {
+        this.dbExports = new HashMap<>();
+        this.dbExports.put(Public.DB_DB2, Public.rethrowBiConsumer(this::DB2Export));
+    }
+
+    @Override
+    public BiConsumer getExport() throws Exception {
+        return this.dbExports.getOrDefault(this.dbType, Public.rethrowBiConsumer(this::jdbcToFile));
+    }
+
+
+    /**
+     * jdbc方式从数据库读取数据，然后写成文件
+     *
+     * @param table 表名
+     * @param files 多个文件
+     * @throws IOException
+     * @throws SQLException
+     */
+    private void fileToRdbByJdbc(String table, List<String> files) throws Exception {
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        BufferedReader in = null;
+        try {
+            conn = getConnection();
+            conn.setAutoCommit(false);
+            String[] cols;
+            String tableCols = getTableColumns(table);
+            if ("".equals(tableCols)) {
+                throw new Exception("not get " + table + " columns");
+            }
+            int cnt = tableCols.split(",").length;
+            StringBuilder sql = new StringBuilder("insert into ");
+            sql.append(table);
+            sql.append("(");
+            String[] paras = new String[cnt];
+            for (int i = 0; i < cnt; i++) {
+                paras[i] = "?";
+            }
+            sql.append(tableCols);
+            sql.append(") values (");
+            sql.append(String.join(",", paras));
+            sql.append(")");
+            stmt = conn.prepareStatement(sql.toString(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+            long rowCnt = 0;
+            String line;
+            for (String file : files) {
+                in = new BufferedReader(new FileReader(file));
+                while ((line = in.readLine()) != null) {
+                    cols = line.split(Public.getColumnDelimiter());
+                    if (cols.length != cnt) {
+                        continue;
+                    }
+                    rowCnt++;
+                    for (int i = 0; i < cnt; i++) {
+                        stmt.setObject(i + 1, cols[i]);
+                    }
+                    stmt.addBatch();
+                    if (rowCnt % Public.getJdbcBatchSize() == 0) {
+                        stmt.executeBatch();
+                    }
+                }
+                stmt.executeBatch();
+            }
+            conn.commit();
+        } finally {
+            if (in != null) {
+                in.close();
+            }
+            if (conn != null) {
+                conn.rollback();
+            }
+            close(stmt);
+            close(conn);
+        }
+    }
+
 
     protected void MySQLLoad(String table, List<String> files) throws SQLException {
         for (String file : files) {
             String sql = String.format(
                 "load data local infile '%s' replace into table %s Fields Terminated By %s Lines Terminated By '\\n' ",
-                file, table, Public.getColumnDelimiterRDB());
+                file, table, Public.getColumnDelimiterRdb());
             exeSQL(sql);
         }
     }
@@ -212,13 +344,13 @@ public class RDB {
         String db = new Public.JdbcUrlSplitter(url).database;
         String host = new Public.JdbcUrlSplitter(url).host;
         String port = new Public.JdbcUrlSplitter(url).port;
+        String ctlFile = Public.getConfDirectory() + table + ".ctl";
+        String logDir = Public.getLogDirectory() + table + "/";
+        String logFile = logDir + table + ".log";
+        String badFile = logDir + table + ".bad";
+        String discardFile = Public.getLogDirectory() + table + ".dcd";
+        Files.createDirectories(Paths.get(logDir));
         for (String file : files) {
-            String ctlFile = Public.getConfDirectory() + table + ".ctl";
-            String logDir = Public.getLogDirectory() + table + "/";
-            Files.createDirectories(Paths.get(logDir));
-            String logFile = logDir + table + ".log";
-            String badFile = logDir + table + ".bad";
-            String discardFile = Public.getLogDirectory() + table + ".dcd";
             String cmd = String.format(
                 "sqlldr %s/%s@%s:%s/%s control=%s data=%s log=%s bad=%s discard=%s direct=true", this.user,
                 this.password, host, port, db, ctlFile, file, logFile, badFile, discardFile
@@ -246,7 +378,7 @@ public class RDB {
         for (String file : files) {
 //            String sql = String.format(
 //                "bulk insert %s from '%s' WITH(FIELDTERMINATOR＝%s, ROWTERMINATOR＝'\\n', batchsize=100000)",
-//                table, file, Public.getColumnDelimiterRDB());
+//                table, file, Public.getColumnDelimiterRdb());
 //            exeSQL(sql);
             String cmd = String.format(
                 "bcp %s in %s -d%s -S%s -U%s -P%s -f%s",
@@ -269,7 +401,7 @@ public class RDB {
         for (String file : files) {
             String sql = String.format(
                 "import from %s of del modified by coldel%s insert into %s",
-                file, Public.getColumnDelimiterRDB(), table);
+                file, Public.getColumnDelimiterRdb(), table);
             exeSQL(sql);
         }
     }
@@ -296,66 +428,11 @@ public class RDB {
 //        copy shop from '/dp/data/stg.s_shop.txt' delimiter E'\x01' ; -- 服务器端导入
         for (String file : files) {
             String cmd = String.format("pg_bulkload --host %s --dbname %s --username %s --password %s --writer=PARALLEL --input %s --output %s --logfile %s --parse-badfile=%s --option \"TYPE=CSV\" --option \"DELIMITER=%s\"",
-                host, db, this.user, this.password, file, table, logFile, badFile, Public.getColumnDelimiterRDB());
+                host, db, this.user, this.password, file, table, logFile, badFile, Public.getColumnDelimiterRdb());
             Public.exeCmd(cmd);
         }
     }
 
-
-    protected void OracleExport(String query, String fileName) throws Exception {
-        jdbcToFile(query, fileName);
-    }
-
-    //   mysql 导出 select * from f_pc_user_cndt_20101128 into outfile 'd:/f.txt' Fields Terminated By ',' Lines Terminated By '\n' -- 只适用于服务器端
-    //        mysql -A service_db -h your_host -utest -ptest -ss --default-character-set=utf8mb4 -e "SELECT * from t_apps limit 300;" | sed 's/\t/","/g;s/^/"/;s/$/"/;s/\n//g' > apps.csv -- 性能待测试
-    protected void MysqlExport(String query, String fileName) throws Exception {
-        jdbcToFile(query, fileName);
-    }
-
-    /**
-     * 导出查询成文件
-     *
-     * @param query    查询语句
-     * @param fileName 文件名
-     * @param table    表名
-     * @throws Exception
-     */
-    //    sqlcmd -S"127.0.0.1"  -U"sa" -P"sa" -d"run" -Q"SELECT * FROM [kbss].[d].[list]" -o d:\aaa.txt # 适用于windows，不适合linux
-    protected void SQLServerExport(String query, String fileName, String table) throws Exception {
-        jdbcToFile(query, fileName);
-
-        // TODO：测试没有通过
-//        String db = new Public.JdbcUrlSplitter(this.jdbcUrl).database;
-//        String host = new Public.JdbcUrlSplitter(this.jdbcUrl).host;
-//        String ctlFile = Public.getConfDirectory() + table + ".fmt";
-//        String cmd = String.format(
-//            "bcp \"%s\" queryout %s -d%s -S%s -U%s -P%s -f%s -c",
-//            query, fileName, db, host, this.user, this.password, ctlFile
-//        );
-//        Public.exeCmd(cmd);
-    }
-
-    //    psql --dbname=my_db_name --host=db_host_ip --username=my_username -c "COPY (select id as COL_ID, name as COL_NAME from my_tab order by id) TO STDOUT with csv header" > D:/client_exp_dir/file_name.csv
-    protected void PostgreSQLExport(String query, String fileName) throws Exception {
-        jdbcToFile(query, fileName);
-    }
-
-    // TODO: export
-    protected void DB2Export(String query, String fileName) throws Exception {
-//        jdbcToFile(query, fileName);
-        String sql = String.format(
-            "export to %s of del modified by coldel%s %s",
-            fileName, Public.getColumnDelimiterRDB(), query);
-        exeSQL(sql);
-    }
-
-    private boolean deleteDirectoryData(String fileName) throws IOException {
-        Path path = Paths.get(fileName);
-        Files.deleteIfExists(path); // 删除数据
-        Files.createDirectories(path.getParent());
-        Files.createFile(path);
-        return true;
-    }
 
     /**
      * jdbc方式从数据库读取数据，然后写成文件
@@ -378,7 +455,7 @@ public class RDB {
             Path path = Paths.get(fileName);
             writer = Files.newBufferedWriter(path);
             stmt = getConnection().prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-            stmt.setFetchSize(Math.toIntExact(Public.getParameters().getTable("base").getLong("jdbc_batch_size", (long) 1)));
+            stmt.setFetchSize(Math.toIntExact(Public.getJdbcFetchSize()));
 
             rs = stmt.executeQuery();
             ResultSetMetaData meta = rs.getMetaData();
@@ -400,40 +477,37 @@ public class RDB {
         }
     }
 
-    /**
-     * spark jdbc接口方式获取SQL执行结果
-     *
-     * @param spark SparkSession
-     * @param sql   SQL语句
-     * @return Dataset
-     */
-    protected void read(@NotNull SparkSession spark, String sql) {
-        LocalDateTime start = LocalDateTime.now();
-        logger.info(Public.getMinusSep());
-        logger.info(sql);
-
-        String table = "";
-        Dataset<Row> df = spark.read().format("jdbc").option("driver", this.driverClass).option("url", this.url)
-            .option("user", this.user).option("password", this.password).option("dbtable", table) // spark 支持pushDownPredicate，可以在连接指定表名，然后用spark sql操作
-            .option("fetchsize", Public.getJdbcFetchSize()).load();
-        df.createOrReplaceTempView(table);
-        spark.sql(sql);
-        Public.printDuration(start, LocalDateTime.now());
-    }
 
     /**
-     * spark jdbc接口方式将df结果保存到rdb表中
-     * 在psotgresql中，原表与目标表的字段类型需要一致。已返现hive字段tinyint，postgresql smallint报 Unsupported type in postgresql: ByteType。
+     * 导出查询成文件
      *
-     * @param df    Dataset
-     * @param table 表名
+     * @param query    查询语句
+     * @param fileName 文件名
+     * @throws Exception
      */
-    protected void write(@NotNull Dataset<Row> df, String table) {
-        LocalDateTime start = LocalDateTime.now();
-        df.write().mode(SaveMode.Append).format("jdbc").option("driver", this.driverClass).option("url", this.url)
-            .option("user", this.user).option("password", this.password).option("dbtable", table)
-            .option("batchsize", Public.getJdbcBatchSize()).save();
-        Public.printDuration(start, LocalDateTime.now());
+    //    sqlcmd -S"127.0.0.1"  -U"sa" -P"sa" -d"run" -Q"SELECT * FROM [kbss].[d].[list]" -o d:\aaa.txt # 适用于windows，不适合linux
+    protected void SQLServerExport(String query, String fileName) throws Exception {
+        jdbcToFile(query, fileName);
+
+        // TODO：测试没有通过
+//        String db = new Public.JdbcUrlSplitter(this.jdbcUrl).database;
+//        String host = new Public.JdbcUrlSplitter(this.jdbcUrl).host;
+//        String ctlFile = Public.getConfDirectory() + table + ".fmt";
+//        String cmd = String.format(
+//            "bcp \"%s\" queryout %s -d%s -S%s -U%s -P%s -f%s -c",
+//            query, fileName, db, host, this.user, this.password, ctlFile
+//        );
+//        Public.exeCmd(cmd);
     }
+
+    // TODO: export
+    protected void DB2Export(String query, String fileName) throws Exception {
+//        jdbcToFile(query, fileName);
+        String sql = String.format(
+            "export to %s of del modified by coldel%s %s",
+            fileName, Public.getColumnDelimiterRdb(), query);
+        exeSQL(sql);
+    }
+
 
 }

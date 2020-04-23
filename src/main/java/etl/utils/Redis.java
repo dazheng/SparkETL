@@ -9,8 +9,13 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class Redis {
-    private final Logger logger = LoggerFactory.getLogger(RDB.class);
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.function.BiConsumer;
+
+public class Redis implements DB {
+    private final Logger logger = LoggerFactory.getLogger(Rdb.class);
     private final String dbType;
     private final String host;
     private final String port;
@@ -27,8 +32,9 @@ public class Redis {
         this.auth = db.getString("auth", "-");
     }
 
-    protected String getDbType() {
-        return this.dbType;
+    @Override
+    public void release() {
+
     }
 
     /**
@@ -46,8 +52,12 @@ public class Redis {
      * @param spark
      * @param sql
      */
+    @Override
     public void read(@NotNull SparkSession spark, String sql) {
-        String table = Public.getTableFromSQL(sql);
+        String table = Public.getTableFromSelectSQL(sql);
+        if ("".equals(table)) {
+            return;
+        }
         Dataset<Row> df = spark.read()
             .format("org.apache.spark.sql.redis")
             .option("host", this.host)
@@ -64,7 +74,8 @@ public class Redis {
      * @param df
      * @param table
      */
-    protected void write(@NotNull Dataset<Row> df, String table) {
+    @Override
+    public void write(@NotNull Dataset<Row> df, String table) {
         df.write()
             .format("org.apache.spark.sql.redis")
             .option("host", host)
@@ -76,6 +87,36 @@ public class Redis {
             .option("table", table)
             .mode(SaveMode.Overwrite)
             .save();
+    }
+
+    @Override
+    public String getTableColumns(String table) throws Exception {
+        return "";
+    }
+
+    @Override
+    public BiConsumer<String, List<String>> getLoad() throws Exception {
+        return null;
+    }
+
+    @Override
+    public BiConsumer<String, String> getExport() throws Exception {
+        return null;
+    }
+
+    /**
+     * 执行插入的SQL
+     *
+     * @param sql
+     * @throws SQLException
+     */
+    @Override
+    public void exeSQL(String sql) throws SQLException {
+        LocalDateTime start = LocalDateTime.now();
+        this.logger.info(Public.getMinusSep());
+        this.logger.info(sql);
+
+        Public.printDuration(start, LocalDateTime.now());
     }
 }
 

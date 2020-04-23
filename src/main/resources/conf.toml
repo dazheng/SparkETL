@@ -3,14 +3,14 @@ log_dir = "/dp/log/"    # 日志文件根路径
 data_dir = "/dp/data/hive_exchange/"    # 数据文件根路径
 conf_dir = "/dp/conf/"   # 配置文件根路径, 如oracle sqlldr控制文件
 hdfs_path = "hdfs://master" # hdfs
-jdbc_fetch_size = 1000 # jdbc每次读取大小
-jdbc_batch_size = 1000 # jdbc每次写入大小
+jdbc_fetch_size = 10 # jdbc每次读取大小
+jdbc_batch_size = 10 # jdbc每次写入大小
 
 [[rdb]]
-id = "dp"
+id = "mysql"
 db_type = "mysql"
 driver_class = "com.mysql.cj.jdbc.Driver"
-url = "jdbc:mysql://db:3306/mysql_tester?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8"
+url = "jdbc:mysql://db:3306/mysql_tester?local_infile=1&zeroDateTimeBehavior=convertToNull&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai"
 user = "test"
 password = "Test123$"
 
@@ -43,7 +43,7 @@ user = "test"
 password = "Test123$"
 
 [[mongo]]
-id = "log_mongo"
+id = "mongo"
 url = "mongodb://hadoop:hadoop@127.0.0.1:27017/test?readPreference=primaryPreferred"
 
 [[es]] # elaticsearch
@@ -57,3 +57,8 @@ host = "db"
 port = "6379"
 dbNO = "0"
 auth = "Test123$"
+
+
+[[kudu]]
+id = "kudu"
+host = "master:7051"

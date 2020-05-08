@@ -32,7 +32,8 @@ public class Dispatch {
      * @throws Exception
      */
     private void extractD() throws Exception {
-        ExtractFromDBDaily dp = new ExtractFromDBDaily(this.spark, this.timeType, this.timeID, this.backDate, "mysql", this.timeType);
+        ExtractFromDBDaily dp = new ExtractFromDBDaily(this.spark, this.timeType, this.timeID, this.backDate,
+            "mysql", this.timeType);
         dp.dpFull();
         dp.release();
     }
@@ -56,7 +57,8 @@ public class Dispatch {
      * @throws Exception
      */
     private void exportD() throws Exception {
-        ExportToDBDaily dp = new ExportToDBDaily(this.spark, this.timeType, this.timeID, this.backDate, "mysql", this.timeType);
+        ExportToDBDaily dp = new ExportToDBDaily(this.spark, this.timeType, this.timeID, this.backDate,
+            "es", this.timeType);
         dp.dpD();
         dp.release();
     }
@@ -78,21 +80,24 @@ public class Dispatch {
                     startLog(appName);
                     setSpark(appName);
                     this.backDate = 1;
-//                    extractD();
-//                    transformD();
+                    extractD();
+                    transformD();
                     exportD();
                     break;
+
                 case 11:
                     appName = "etl_1hour";
                     startLog(appName);
                     setSpark(appName);
                     break;
+
             }
         } catch (Exception e) {
             this.logger.error(e.toString(), e);
         } finally {
             this.spark.stop();
-            this.logger.info("timeID={} appName={} time taken {} s", timeID, appName, Duration.between(start, LocalDateTime.now()).getSeconds());
+            this.logger.info("timeID={} appName={} time taken {} s",
+                timeID, appName, Duration.between(start, LocalDateTime.now()).getSeconds());
         }
     }
 

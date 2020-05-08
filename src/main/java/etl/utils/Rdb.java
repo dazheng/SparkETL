@@ -1,7 +1,6 @@
 package etl.utils;
 
 import com.moandjiezana.toml.Toml;
-import org.apache.commons.lang.StringUtils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SaveMode;
@@ -46,8 +45,8 @@ public class Rdb implements DB {
         this.password = db.getString("password");
         this.dbType = new Public.JdbcUrlSplitter(this.url).driverName;
         this.conn = connection();
-        RdbLoads();
-        RdbExports();
+        RdbLoads(); // 数据库对应的load方式
+        RdbExports(); // 数据库对应的export方式
     }
 
 
@@ -112,9 +111,11 @@ public class Rdb implements DB {
         LocalDateTime start = LocalDateTime.now();
         this.logger.info(Public.getMinusSep());
         this.logger.info(sql);
+
         PreparedStatement stmt = getConnection().prepareStatement(sql);
         stmt.executeUpdate();
         close(stmt);
+
         Public.printDuration(start, LocalDateTime.now());
     }
 
@@ -128,40 +129,23 @@ public class Rdb implements DB {
      */
     @Override
     public String getTableColumns(String table) throws Exception {
-        String sql = "";
-        switch (this.dbType) {
-            case Public.DB_MYSQL:
-                sql = "select column_name from information_schema.columns where table_schema = ? and table_name = ? order by ordinal_position";
-                break;
-            case Public.DB_ORACLE:
-                sql = "select column_name from user_tab_columns where table_name = ? order by column_id";
-                break;
-            case Public.DB_SQLSERVER:
-                sql = "select column_name from information_schema.columns where table_catalog = ? and table_name = ? order by ordinal_position";
-                break;
-            case Public.DB_POSTGRESQL:
-                sql = "select column_name from information_schema.columns where table_catalog = ? and table_name = ? order by ordinal_position";
-                break;
-            case Public.DB_DB2:
-                sql = "SELECT colname column_name from syscat.columns where tabschema = ? and tabname = ? order by colno";
-            default:
-                this.logger.error("not support {}", this.dbType);
-                throw new Exception("not support " + this.dbType);
-        }
-
         PreparedStatement stmt = null;
         ResultSet rs = null;
-        String s = "";
+        String sql = getTableColumnSql();
 
         try {
             String schema = new Public.JdbcUrlSplitter(this.url).database;
             stmt = getConnection().prepareStatement(sql);
+
+            // oracle不需要schema
             if ("oracle".equals(this.dbType)) {
                 stmt.setString(1, table.toUpperCase());
             } else {
                 stmt.setString(1, schema);
                 stmt.setString(2, table);
             }
+
+            // 获取查询结果
             rs = stmt.executeQuery();
             StringBuilder cs = new StringBuilder();
             while (rs.next()) {
@@ -169,22 +153,60 @@ public class Rdb implements DB {
                 cs.append(",");
             }
 
-            s = cs.toString();
+            String s = cs.toString();
             if (s.length() > 0) {
                 s = s.substring(0, s.length() - 1);
             }
+            return s;
+
         } finally {
             close(rs);
             close(stmt);
         }
-        return s;
     }
 
-    private boolean deleteDirectoryData(String fileName) throws IOException {
+    private String getTableColumnSql() throws Exception {
+        String sql = "";
+        switch (this.dbType) {
+            case Public.DB_MYSQL:
+                sql = "select column_name from information_schema.columns where table_schema = ? and table_name = ? order by ordinal_position";
+                break;
+
+            case Public.DB_ORACLE:
+                sql = "select column_name from user_tab_columns where table_name = ? order by column_id";
+                break;
+
+            case Public.DB_SQLSERVER:
+                sql = "select column_name from information_schema.columns where table_catalog = ? and table_name = ? order by ordinal_position";
+                break;
+
+            case Public.DB_POSTGRESQL:
+                sql = "select column_name from information_schema.columns where table_catalog = ? and table_name = ? order by ordinal_position";
+                break;
+
+            case Public.DB_DB2:
+                sql = "select colname column_name from syscat.columns where tabschema = ? and tabname = ? order by colno";
+                break;
+
+            default:
+                this.logger.error("not support {}", this.dbType);
+                throw new IllegalArgumentException();
+        }
+        return sql;
+    }
+
+    /**
+     * 如果有此文件则删除，否则则创建空文件
+     *
+     * @param fileName
+     * @return
+     * @throws IOException
+     */
+    private boolean deleteDirectoryFile(String fileName) throws IOException {
         Path path = Paths.get(fileName);
-        Files.deleteIfExists(path); // 删除数据
+        Files.deleteIfExists(path); // 删除文件
         Files.createDirectories(path.getParent());
-        Files.createFile(path);
+        Files.createFile(path); // 创建空文件
         return true;
     }
 
@@ -201,15 +223,19 @@ public class Rdb implements DB {
         logger.info(Public.getMinusSep());
         logger.info(sql);
 
+        // 从查询sql语句中获取表名
         String table = Public.getTableFromSelectSQL(sql);
         if ("".equals(table)) {
             return;
         }
+
+        // spark读取数据，生成临时视图，并执行SQL
         Dataset<Row> df = spark.read().format("jdbc").option("driver", this.driverClass).option("url", this.url)
             .option("user", this.user).option("password", this.password).option("dbtable", table) // spark 支持pushDownPredicate，可以在连接指定表名，然后用spark sql操作
             .option("fetchsize", Public.getJdbcFetchSize()).load();
         df.createOrReplaceTempView(table);
         spark.sql(sql);
+
         Public.printDuration(start, LocalDateTime.now());
     }
 
@@ -223,12 +249,19 @@ public class Rdb implements DB {
     @Override
     public void write(@NotNull Dataset<Row> df, String table) {
         LocalDateTime start = LocalDateTime.now();
+
         df.write().mode(SaveMode.Append).format("jdbc").option("driver", this.driverClass).option("url", this.url)
             .option("user", this.user).option("password", this.password).option("dbtable", table)
             .option("batchsize", Public.getJdbcBatchSize()).save();
+
         Public.printDuration(start, LocalDateTime.now());
     }
 
+    /**
+     * 数据库支持的load方式加入map中
+     *
+     * @throws Exception
+     */
     private void RdbLoads() throws Exception {
         this.dbLoads = new HashMap<>();
         this.dbLoads.put(Public.DB_MYSQL, Public.rethrowBiConsumer(this::MySQLLoad));
@@ -238,16 +271,33 @@ public class Rdb implements DB {
         this.dbLoads.put(Public.DB_DB2, Public.rethrowBiConsumer(this::DB2Load));
     }
 
+    /**
+     * 获取数据库支持的load方式，没有则用fileToRdbByJdbc
+     *
+     * @return laod方式
+     * @throws Exception
+     */
     @Override
     public BiConsumer getLoad() throws Exception {
         return this.dbLoads.getOrDefault(this.dbType, Public.rethrowBiConsumer(this::fileToRdbByJdbc));
     }
 
+    /**
+     * 数据库支持的load方式加入map中
+     *
+     * @throws Exception
+     */
     private void RdbExports() throws Exception {
         this.dbExports = new HashMap<>();
         this.dbExports.put(Public.DB_DB2, Public.rethrowBiConsumer(this::DB2Export));
     }
 
+    /**
+     * 获取数据库支持的export方式，没有则用jdbcToFile
+     *
+     * @return
+     * @throws Exception
+     */
     @Override
     public BiConsumer getExport() throws Exception {
         return this.dbExports.getOrDefault(this.dbType, Public.rethrowBiConsumer(this::jdbcToFile));
@@ -263,17 +313,16 @@ public class Rdb implements DB {
      * @throws SQLException
      */
     private void fileToRdbByJdbc(String table, List<String> files) throws Exception {
-        Connection conn = null;
         PreparedStatement stmt = null;
         BufferedReader in = null;
         try {
-            conn = getConnection();
-            conn.setAutoCommit(false);
-            String[] cols;
+            // 获取表字段
             String tableCols = getTableColumns(table);
             if ("".equals(tableCols)) {
                 throw new Exception("not get " + table + " columns");
             }
+
+            // 拼接insert语句
             int cnt = tableCols.split(",").length;
             StringBuilder sql = new StringBuilder("insert into ");
             sql.append(table);
@@ -286,9 +335,16 @@ public class Rdb implements DB {
             sql.append(") values (");
             sql.append(String.join(",", paras));
             sql.append(")");
+
+            // 连接数据库
+            Connection conn = getConnection();
+            conn.setAutoCommit(false);
             stmt = conn.prepareStatement(sql.toString(), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+
+            // 将数据以批量方式写入数据库
             long rowCnt = 0;
             String line;
+            String[] cols;
             for (String file : files) {
                 in = new BufferedReader(new FileReader(file));
                 while ((line = in.readLine()) != null) {
@@ -297,6 +353,7 @@ public class Rdb implements DB {
                         continue;
                     }
                     rowCnt++;
+
                     for (int i = 0; i < cnt; i++) {
                         stmt.setObject(i + 1, cols[i]);
                     }
@@ -307,6 +364,7 @@ public class Rdb implements DB {
                 }
                 stmt.executeBatch();
             }
+
             conn.commit();
         } finally {
             if (in != null) {
@@ -316,11 +374,17 @@ public class Rdb implements DB {
                 conn.rollback();
             }
             close(stmt);
-            close(conn);
         }
     }
 
 
+    /**
+     * MySQL支持的load方式入库
+     *
+     * @param table 表名
+     * @param files 文件列表
+     * @throws SQLException
+     */
     protected void MySQLLoad(String table, List<String> files) throws SQLException {
         for (String file : files) {
             String sql = String.format(
@@ -344,12 +408,14 @@ public class Rdb implements DB {
         String db = new Public.JdbcUrlSplitter(url).database;
         String host = new Public.JdbcUrlSplitter(url).host;
         String port = new Public.JdbcUrlSplitter(url).port;
+
         String ctlFile = Public.getConfDirectory() + table + ".ctl";
         String logDir = Public.getLogDirectory() + table + "/";
         String logFile = logDir + table + ".log";
         String badFile = logDir + table + ".bad";
         String discardFile = Public.getLogDirectory() + table + ".dcd";
         Files.createDirectories(Paths.get(logDir));
+
         for (String file : files) {
             String cmd = String.format(
                 "sqlldr %s/%s@%s:%s/%s control=%s data=%s log=%s bad=%s discard=%s direct=true", this.user,
@@ -375,11 +441,8 @@ public class Rdb implements DB {
         String db = new Public.JdbcUrlSplitter(this.url).database;
         String host = new Public.JdbcUrlSplitter(this.url).host;
         String ctlFile = Public.getConfDirectory() + table + ".fmt";
+
         for (String file : files) {
-//            String sql = String.format(
-//                "bulk insert %s from '%s' WITH(FIELDTERMINATOR＝%s, ROWTERMINATOR＝'\\n', batchsize=100000)",
-//                table, file, Public.getColumnDelimiterRdb());
-//            exeSQL(sql);
             String cmd = String.format(
                 "bcp %s in %s -d%s -S%s -U%s -P%s -f%s",
                 table, file, db, host, this.user, this.password, ctlFile
@@ -419,6 +482,7 @@ public class Rdb implements DB {
     protected void PostgreSQLLoad(String table, List<String> files) throws IOException, InterruptedException {
         String db = new Public.JdbcUrlSplitter(this.url).database;
         String host = new Public.JdbcUrlSplitter(this.url).host;
+
         String logDir = Public.getLogDirectory() + table + "/";
         Files.createDirectories(Paths.get(logDir));
         String logFile = logDir + table + ".log";
@@ -446,30 +510,36 @@ public class Rdb implements DB {
         BufferedWriter writer = null;
         PreparedStatement stmt = null;
         ResultSet rs = null;
+
         try {
             this.logger.info(Public.getMinusSep());
             this.logger.info(query);
-            if (!deleteDirectoryData(fileName)) {
+            if (!deleteDirectoryFile(fileName)) {
                 return;
             }
-            Path path = Paths.get(fileName);
-            writer = Files.newBufferedWriter(path);
-            stmt = getConnection().prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-            stmt.setFetchSize(Math.toIntExact(Public.getJdbcFetchSize()));
 
+            // 连接数据库，进行查询
+            stmt = this.conn.prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+            stmt.setFetchSize(Math.toIntExact(Public.getJdbcFetchSize()));
             rs = stmt.executeQuery();
+
+            // 获取列信息
             ResultSetMetaData meta = rs.getMetaData();
             int cnt = meta.getColumnCount();
             String[] cols = new String[cnt];
+
+            // 将每条记录写入文件
+            Path path = Paths.get(fileName);
+            writer = Files.newBufferedWriter(path);
             while (rs.next()) {
                 for (int i = 0; i < cnt; i++) { // 下标从1开始
                     cols[i] = rs.getString(i + 1);
                 }
-                writer.write(StringUtils.join(cols, Public.getColumnDelimiter()) + "\n");
+                writer.write(String.join(Public.getColumnDelimiter() + "\n", cols));
             }
+            writer.flush();
         } finally {
             if (writer != null) {
-                writer.flush();
                 writer.close();
             }
             close(rs);
@@ -508,6 +578,4 @@ public class Rdb implements DB {
             fileName, Public.getColumnDelimiterRdb(), query);
         exeSQL(sql);
     }
-
-
 }

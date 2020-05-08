@@ -10,6 +10,12 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+    <repositories>
+        <repository>
+            <id>elastic.co</id>
+            <url>https://artifacts.elastic.co/maven</url>
+        </repository>
+    </repositories>
     <dependencies>
         <!-- https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
@@ -163,6 +169,17 @@
         <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch-spark-20_2.11</artifactId>
+            <version>7.6.2</version>
+        </dependency>
+<!--        &lt;!&ndash; https://mvnrepository.com/artifact/com.amazon.opendistroforelasticsearch.client/opendistro-sql-jdbc &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>com.amazon.opendistroforelasticsearch.client</groupId>-->
+<!--            <artifactId>opendistro-sql-jdbc</artifactId>-->
+<!--            <version>1.6.0.0</version>-->
+<!--        </dependency>-->
+        <dependency>
+            <groupId>org.elasticsearch.plugin</groupId>
+            <artifactId>x-pack-sql-jdbc</artifactId>
             <version>7.6.2</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.redislabs/spark-redis -->

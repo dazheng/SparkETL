@@ -26,6 +26,8 @@ public class Public {
     static final Properties PROPERTIES = new Properties(System.getProperties());
     private final static String LineDelimiter = PROPERTIES.getProperty("line.separator"); // 操作系统换行符
     private final static String FileDelimiter = PROPERTIES.getProperty("file.separator"); // 操作系统路径分隔符
+
+    // 支持的各数据库
     final static String DB_Rdb = "rdb";
     final static String DB_ORACLE = "oracle";
     final static String DB_MYSQL = "mysql";
@@ -36,7 +38,10 @@ public class Public {
     final static String DB_ELASTICSEARCH = "es";
     final static String DB_REDIS = "redis";
     final static String DB_KUDU = "kudu";
-    final static String[] TOML_DB_TABLE = {DB_Rdb, DB_MONGODB, DB_ELASTICSEARCH, DB_REDIS, DB_KUDU};
+
+
+    final static String[] TOML_DB_TABLE = {DB_Rdb, DB_MONGODB, DB_ELASTICSEARCH, DB_REDIS, DB_KUDU}; // conf.toml中包含的数据库种类
+
     private static Toml toml = parseParameters(); // 获取解析后的toml配置文件
 
     static String getMinusSep() {
@@ -70,18 +75,29 @@ public class Public {
         logger.info("time taken {} s", Duration.between(start, end).getSeconds());
     }
 
+    // 数据目录
     protected static String getDataDirectory() {
         return toml.getTable("base").getString("data_dir");
     }
 
+    // 日志目录
     protected static String getLogDirectory() {
         return toml.getTable("base").getString("log_dir");
     }
 
+    // 配置目录
     protected static String getConfDirectory() {
         return toml.getTable("base").getString("conf_dir");
     }
 
+
+    /**
+     * 表及timeType对应的数据目录
+     *
+     * @param table    表名
+     * @param timeType 时间类型
+     * @return 最终的数据目录
+     */
     protected static String getTableDataDirectory(String table, String timeType) {
         return getDataDirectory() + table + "/" + timeType + "/";
     }
@@ -95,12 +111,14 @@ public class Public {
      * @throws IOException
      */
     public static String readSqlFile(String fileName) throws IOException {
-        StringBuilder sb = null;
         BufferedReader in =
-            new BufferedReader(new InputStreamReader(Objects.requireNonNull(App.class.getClassLoader().getResourceAsStream(fileName))));
-        sb = new StringBuilder();
-        String line;
+            new BufferedReader(new InputStreamReader(Objects.requireNonNull(
+                App.class.getClassLoader().getResourceAsStream(fileName))));
+        StringBuilder sb = new StringBuilder();
+        String line = "";
         Pattern p = Pattern.compile("\\s+");
+
+        // 每行sql去掉无用字符并写入sb
         while ((line = in.readLine()) != null) {
             line = line.trim().replace("\r\n", getOSLineDelimiter());
             Matcher m = p.matcher(line);
@@ -110,10 +128,16 @@ public class Public {
                 sb.append(getOSLineDelimiter());
             }
         }
+
         in.close();
         return sb.toString();
     }
 
+    /**
+     * 读取conf.toml文件，返回文件内容
+     *
+     * @return
+     */
     private static Toml parseParameters() {
         InputStreamReader in =
             new InputStreamReader(Objects.requireNonNull(App.class.getClassLoader().getResourceAsStream("conf.toml")));
@@ -151,6 +175,8 @@ public class Public {
     static Map<String, Object> getDB(String dbID) {
         Toml toml = getParameters();
         Map<String, Object> map = new HashMap<>();
+
+        // 获取每个数据库类型里的配置
         for (String table : TOML_DB_TABLE) {
             List<Toml> dbs = toml.getTables(table);
             for (Toml db : dbs) {
@@ -161,6 +187,27 @@ public class Public {
                 }
             }
         }
+
+        return null;
+    }
+
+    /**
+     * 获取conf.toml中对应数据库信息
+     *
+     * @param dbID 数据库id
+     * @return
+     * @throws Exception
+     */
+    public static DB getDBInfo(String dbID) throws Exception {
+        Map<String, Object> map = getDB(dbID);
+
+        if (map != null) {
+            String type = (String) map.get("type");
+            Toml tdb = (Toml) map.get("db");
+            DBFactory dbf = new DBFactory();
+            return dbf.produce(type, tdb);
+        }
+
         return null;
     }
 
@@ -180,6 +227,7 @@ public class Public {
                     return false;
             }
         }
+
         if (dir.delete()) {
             return true;
         } else {
@@ -198,6 +246,7 @@ public class Public {
         sql = sql.toLowerCase();
         int index = sql.indexOf("from ");
         sql = sql.substring(index + 5);
+
         Pattern p = Pattern.compile("\\s+");
         Matcher m = p.matcher(sql);
         if (!m.find()) {
@@ -239,10 +288,12 @@ public class Public {
         InputStream ins = p.getInputStream();
         BufferedReader reader = new BufferedReader(new InputStreamReader(ins, StandardCharsets.UTF_8));
         String line = null;
+
         while ((line = reader.readLine()) != null) {
             String msg = new String(line.getBytes(), StandardCharsets.UTF_8);
             logger.info(msg);
         }
+
         int exitCode = p.waitFor();
         if (exitCode == 0) {
             logger.info("{} succeed", cmd);
@@ -273,19 +324,22 @@ public class Public {
         };
     }
 
-
     public static class JdbcUrlSplitter {
-        public String driverName, host, port, database, params;
+        public String driverName, host, port, database;
 
+        /**
+         * 根据jdbcURL获取其中的信息
+         *
+         * @param jdbcUrl jdbc字符串
+         */
         public JdbcUrlSplitter(String jdbcUrl) {
-            int pos, pos1, pos2;
-            String connUri;
-
+            int pos1, pos2;
+            String connUri, params = null;
             if (jdbcUrl == null || !jdbcUrl.startsWith("jdbc:")
                 || (pos1 = jdbcUrl.indexOf(':', 5)) == -1)
                 throw new IllegalArgumentException("Invalid JDBC url.");
-
             driverName = jdbcUrl.substring(5, pos1);
+
             if ((pos2 = jdbcUrl.indexOf(';', pos1)) == -1) {
                 connUri = jdbcUrl.substring(pos1 + 1);
             } else {
@@ -293,42 +347,31 @@ public class Public {
                 params = jdbcUrl.substring(pos2 + 1);
             }
 
-            if (connUri.startsWith("//") || connUri.startsWith("thin:@")) {
-                if (connUri.startsWith("thin:@")) {
-                    connUri = connUri.substring(6);
+            connUri = connUri.substring(connUri.indexOf("//") + 2);
+            if ((pos1 = connUri.indexOf('/')) != -1) {
+                database = connUri.substring(pos1 + 1);
+                host = connUri.substring(0, pos1);
+            } else if (params != null) {
+                // 如sqlserver
+                if ((pos1 = params.toLowerCase().indexOf("databasename=")) != -1) {
+                    if((pos2 = params.toLowerCase().indexOf(";", pos1))!=-1) {
+                        database = params.substring(pos1 + 13, pos2);
+                    }else{
+                        database = params.substring(pos1 + 13);
+                    }
+                } else {
+                    throw new IllegalArgumentException("Invalid JDBC url.");
                 }
-                if (driverName.equals("sqlserver")) {
-                    String[] parmsArray = params.split(";");
-                    for (String p : parmsArray) {
-                        String[] ps = p.split("=");
-                        if (ps.length < 2) {
-                            throw new IllegalArgumentException("Invalid JDBC url.");
-                        }
-                        if (ps[0].toLowerCase().equals("databasename")) {
-                            database = ps[1];
-                            break;
-                        }
-                    }
-                    String[] hostPort = connUri.split(":");
-                    host = hostPort[0].substring(2);
-                    if (hostPort.length >= 2) {
-                        port = hostPort[1];
-                    }
-                } else if ((pos = connUri.indexOf('/', 2)) != -1) {
-                    host = connUri.substring(2, pos);
-                    database = connUri.substring(pos + 1);
-                    int index = database.indexOf("?");
-                    if (index != -1) {
-                        database = database.substring(0, index);
-                    }
+                host = connUri;
+            }
 
-                    if ((pos = host.indexOf(':')) != -1) {
-                        port = host.substring(pos + 1);
-                        host = host.substring(0, pos);
-                    }
-                }
-            } else {
-                database = connUri.substring(0, connUri.indexOf("?"));
+            if ((pos1 = database.indexOf("?")) != -1) {
+                database = database.substring(0, pos1);
+            }
+
+            if ((pos1 = host.indexOf(':')) != -1) {
+                port = host.substring(pos1 + 1);
+                host = host.substring(0, pos1);
             }
         }
     }

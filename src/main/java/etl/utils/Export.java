@@ -25,19 +25,10 @@ public class Export extends ETL {
 
     public Export(SparkSession spark, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) throws Exception {
         super(spark, timeType, timeID, backDate, frequency);
-        this.db = getDB(dbID);
+        this.db = Public.getDBInfo(dbID);
     }
 
-    private DB getDB(String dbID) throws Exception {
-        Map<String, Object> map = Public.getDB(dbID);
-        if (map != null) {
-            String type = (String) map.get("type");
-            Toml tdb = (Toml) map.get("db");
-            DBFactory dbf = new DBFactory();
-            return dbf.produce(type, tdb);
-        }
-        return null;
-    }
+
 
     /**
      * 释放申请的资源，目前是只有数据库连接
@@ -48,12 +39,12 @@ public class Export extends ETL {
         this.db.release();
     }
 
-    public static String getExportSqlDir() {
+    private static String getExportSqlDir() {
         return "export/";
     }
 
     /**
-     * 删除Rdb的数据
+     * 删除Rdb的数据，表分区或者字段必须包含time_type,time_id组合
      *
      * @param table Rdb表名
      * @throws SQLException
@@ -139,14 +130,18 @@ public class Export extends ETL {
         if (table == null || table.isEmpty()) {
             this.db.exeSQL(sql);
         } else {
+            // 生成本地文件
             Dataset<Row> df = exeSQL(sql);
             String frequency = String.valueOf(getFrequency());
             toLocalDirectory(df, Public.getTableDataDirectory(table, frequency));
+
+            // 获取本地文件
             List<String> files = this.db.getLoadFiles(table, frequency);
             if (files.isEmpty()) {
                 return;
             }
-//            RdbLoad(table, files, df);
+
+            // load入库
             BiConsumer<String, List<String>> func = this.db.getLoad();
             func.accept(table, files);
         }
@@ -174,6 +169,7 @@ public class Export extends ETL {
                 break;
             default:
                 this.logger.error("not suport {}", exeType);
+                throw new IllegalArgumentException();
         }
     }
 
@@ -192,6 +188,8 @@ public class Export extends ETL {
         if (cs.length() == 0) {
             return null;
         }
+
+        // 多返回值写入map
         Map<String, String> map = new HashMap<String, String>();
         map.put("native_table", nativeTable);
         map.put("columns", cs);
@@ -206,13 +204,17 @@ public class Export extends ETL {
      */
     public void simpleToRdbIncrease(@NotNull List<String> tables) throws Exception {
         for (String table : tables) {
+            // 获取表列名及时间参数
             Map<String, String> paras = getRdbTableColumns(table);
             assert paras != null;
             String nativeTable = paras.get("native_table");
             String cs = paras.get("columns");
             String start = getStartTimeID();
             String end = getEndTimeID();
-            String sql = "select " + cs + " from " + table + " where time_type = " + getTimeType() + " and time_id between '" + start + "' and '" + end + "'";
+
+            // 拼接SQL并执行
+            String sql = "select " + cs + " from " + table + " where time_type = " + getTimeType()
+                + " and time_id between '" + start + "' and '" + end + "'";
             toRdbTableIncreate(nativeTable, sql);
         }
     }
@@ -225,10 +227,13 @@ public class Export extends ETL {
      */
     public void simpleToRdbFull(@NotNull List<String> tables) throws Exception {
         for (String table : tables) {
+            // 获取表列名
             Map<String, String> paras = getRdbTableColumns(table);
             assert paras != null;
             String nativeTable = paras.get("native_table");
             String cs = paras.get("columns");
+
+            // 拼接SQL并执行
             String sql = "select " + cs + " from " + table;
             toRdbTableFull(nativeTable, sql);
         }

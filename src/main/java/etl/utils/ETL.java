@@ -45,7 +45,7 @@ public class ETL extends Time {
      * @return 解析后的sql片段
      */
     @NotNull
-    private Map<String, String> decideByType(@NotNull String line, Integer type) {
+    private Map<String, String> decideByType(@NotNull String line, Integer type) throws IllegalArgumentException {
         String lineLower = line.toLowerCase();
         Map<String, String> map = new HashMap<String, String>();
         switch (type) {
@@ -56,6 +56,7 @@ public class ETL extends Time {
                     return map;
                 }
                 break;
+
             case 2: // 导入其他RdbMS数据或者生成临时视图
                 if (lineLower.substring(0, 7).equals("insert ")) {
                     map.put(this.isOrNot, this.is);
@@ -66,6 +67,7 @@ public class ETL extends Time {
                     map.put("line", line.substring(1).trim());
                     return map;
                 }
+
             case 3:  // 导出数据到其他RdbMS
                 if (lineLower.startsWith("@")) {
                     map.put(this.isOrNot, this.is);
@@ -73,6 +75,8 @@ public class ETL extends Time {
                     return map;
                 }
                 break;
+            default: // 不支持的方式
+                throw new IllegalArgumentException();
         }
         map.put(this.isOrNot, this.not);
         map.put("line", "");
@@ -92,6 +96,8 @@ public class ETL extends Time {
         String sql = "";
         String[] s = fromSql.trim().split(Public.getOSLineDelimiter());
         StringBuilder lines = new StringBuilder();
+
+        // 处理每行SQL
         for (String line : s) {
             String l = line.trim().toLowerCase();
             if (!l.substring(0, 2).equals("--") && !l.substring(0, 2).equals("//")) {
@@ -112,7 +118,10 @@ public class ETL extends Time {
             }
             lines.append(line).append(Public.getOSLineDelimiter());
         }
+
         sql = lines.toString();
+
+        // 返回结果放入map中
         Map<String, String> map = new HashMap<String, String>();
         map.put(isOrNot, isRunable);
         map.put("insert", insert);
@@ -147,6 +156,8 @@ public class ETL extends Time {
             return;
         }
         String[] s = sqlString.split(";");
+
+        // 执行每个SQL语句
         for (String sql : s) {
             sql = sql.trim();
             if (sql.length() < 7) {
@@ -158,7 +169,7 @@ public class ETL extends Time {
             String insert = rs.get("insert");
             sql = rs.get("sql");
             if (f.equals(this.is)) {
-                func.accept(insert, sql);
+                func.accept(insert, sql); // 执行BiConsumer函数
             }
         }
     }
@@ -191,14 +202,19 @@ public class ETL extends Time {
         Configuration configuration = null;  //配置类
         Toml toml = Public.getParameters();
         String HDFS_PATH = toml.getTable("base").getString("hdfs_path", "hdfs://master");
+
         try {
+            // 创建路径，删除原来的数据
             String hdfsDir = "/tmp/" + localDir.substring(localDir.indexOf("/"));
             df.coalesce(8).write().mode("overwrite").option("sep", Public.getColumnDelimiter()).csv(hdfsDir);
             Files.createDirectories(Paths.get(localDir));
             Public.deleteDirectory(new File(localDir));
+
+            // hdfs配置
             configuration = new Configuration();
             configuration.set("fs.defaultFS", HDFS_PATH);
             fileSystem = FileSystem.get(configuration);
+
             fileSystem.copyToLocalFile(new Path(hdfsDir), new Path(localDir));
         } finally {
             if (configuration != null) {

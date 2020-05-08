@@ -42,11 +42,25 @@ url = "jdbc:db2://db:50000/test"
 user = "test"
 password = "Test123$"
 
+#[[rdb]]
+#id = "es"  # https://github.com/opendistro-for-elasticsearch/sql-jdbc
+#driver_class = "com.amazon.opendistroforelasticsearch.jdbc.Driver"
+#url = "jdbc:elasticsearch://localhost:9200"
+#user = "test"
+#password = "Test123$"
+
+[[rdb]]
+id = "es"
+driver_class = "org.elasticsearch.xpack.sql.jdbc.EsDriver"
+url = "jdbc:es://http://db:3456/?timezone=UTC"
+user = "elastic"
+password = "Test123$"
+
 [[mongo]]
 id = "mongo"
 url = "mongodb://hadoop:hadoop@127.0.0.1:27017/test?readPreference=primaryPreferred"
 
-[[es]] # elaticsearch
+[[es]] # elasticsearch
 id = "es"
 host = "db"
 port = "9200"

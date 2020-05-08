@@ -66,7 +66,7 @@ public class Time {
         String timeID = this.timeID;
 
         switch (this.timeType) { // time_type: 1 日； 2 周；3 月； 4 年；11 小时； 12 半小时； 13 10分钟； 14 5分钟； 15 1分钟
-            case 1:
+            case 1: // 天粒度etl
                 LocalDate date = LocalDate.parse(this.timeID, this.dateFormatter);
                 startTimeID = date.plusDays(-(this.backDate - 1)).format(this.dateFormatter);
                 startDateTime = startTimeID + " 00:00:00";
@@ -74,6 +74,7 @@ public class Time {
                 startDateID = startTimeID;
                 endDateID = this.timeID;
                 break;
+
             case 11:
                 LocalDate dateTime = LocalDate.parse(this.timeID, this.dateTimeFormatter);
                 timeID = dateTime.format(dateFormatter);
@@ -81,6 +82,8 @@ public class Time {
                 endDateTime = timeID + " 23:59:59";
                 break;
         }
+
+        // 参数写入map
         Map<String, String> map = new HashMap<>();
         map.put("time_type", timeType);
         map.put("time_id", timeID);
@@ -109,7 +112,7 @@ public class Time {
                 return LocalDate.parse(this.timeID, this.monthFormatter).plusMonths(1).format(this.dateFormatter);
             default:
                 this.logger.error("not support time_type={}", this.timeType);
-                throw new Exception("not support " + String.valueOf(this.timeType));
+                throw new IllegalArgumentException();
         }
     }
 

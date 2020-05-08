@@ -16,7 +16,7 @@ public class Transform extends ETL {
         super(spark, timeType, timeID, backDate, frequency);
     }
 
-    public static String getTransformSqlDir() {
+    private static String getTransformSqlDir() {
         return "transform/";
     }
 
@@ -33,6 +33,8 @@ public class Transform extends ETL {
         for (String t : tables) {
             String start = getStartTimeID();
             String end = getEndTimeID();
+
+            // 分区逐个删除
             while (start.compareTo(end) <= 0) {
                 String sql = String.format("alter table %s drop if exists partition(time_type=%s, time_id='%s')", t, getTimeType(), start);
                 exeSQL(sql);
@@ -68,13 +70,14 @@ public class Transform extends ETL {
     protected void exeSQLFile(String fileName, String exeType) throws Exception {
         String sqls = Public.readSqlFile(getTransformSqlDir() + fileName);
         exeType = exeType.toLowerCase();
+
         if ("insert".equals(exeType)) {
             exeSQLs(sqls, Public.rethrowBiConsumer(this::exeSQL), 1);
         } else if ("view".equals(exeType)) {
             exeSQLs(sqls, this::sqlToSpecialView, 2);
         } else {
             this.logger.error("not support {}", exeType);
-            throw new Exception("not support " + exeType);
+            throw new IllegalArgumentException();
         }
     }
 }

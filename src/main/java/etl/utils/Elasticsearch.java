@@ -4,6 +4,7 @@ import com.moandjiezana.toml.Toml;
 import com.mongodb.client.MongoClient;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.elasticsearch.spark.sql.api.java.JavaEsSparkSQL;
 import org.jetbrains.annotations.NotNull;
@@ -56,8 +57,9 @@ public class Elasticsearch implements DB {
         if ("".equals(table)) {
             return;
         }
-        Dataset<Row> df = spark.read().format("org.elasticsearch.spark.sql").option("es.nodes", this.host)
-            .option("es.port", this.port).option("pushdown", true).load(table + "/_doc"); // { "query" : { "term" : { "user" : "costinl" } } }
+        Dataset<Row> df = spark.read().format("org.elasticsearch.spark.sql")
+            .option("es.nodes", this.host).option("es.port", this.port).option("pushdown", true)
+            .load(table + "/_doc"); // { "query" : { "term" : { "user" : "costinl" } } }
         df.createOrReplaceTempView(table);
         spark.sql(sql);
     }
@@ -71,8 +73,9 @@ public class Elasticsearch implements DB {
      */
     @Override
     public void write(@NotNull Dataset<Row> df, String table) {
-//        df.write().format("org.elasticsearch.spark.sql").option("es.nodes", host).option("es.port", this.port).mode("append").save(type + "/" + table);
-        JavaEsSparkSQL.saveToEs(df, table + "/_doc");
+        df.write().mode(SaveMode.Append).format("org.elasticsearch.spark.sql")
+            .option("es.nodes", host).option("es.port", this.port)
+            .save(table + "/_doc");
     }
 
     @Override

@@ -20,28 +20,23 @@ public class Extract extends ETL {
     public Extract(SparkSession spark, Integer timeType, String timeID, Integer backDate, String dbID, Integer frequency) throws Exception {
         super(spark, timeType, timeID, backDate, frequency);
         this.spark = spark;
-        this.db = getDB(dbID);
+        this.db = Public.getDBInfo(dbID);
         if (this.db == null) {
             return;
         }
     }
 
-    private DB getDB(String dbID) throws Exception {
-        Map<String, Object> map = Public.getDB(dbID);
-        if (map != null) {
-            String type = (String) map.get("type");
-            Toml tdb = (Toml) map.get("db");
-            DBFactory dbf = new DBFactory();
-            return dbf.produce(type, tdb);
-        }
-        return null;
-    }
 
+    /**
+     * 释放申请的资源
+     *
+     * @throws Exception
+     */
     public void release() throws Exception {
         this.db.release();
     }
 
-    public static String getExtractSQLDirectory() {
+    private static String getExtractSQLDirectory() {
         return "extract/";
     }
 
@@ -71,12 +66,12 @@ public class Extract extends ETL {
             exeSQLs(sqls, Public.rethrowBiConsumer(this::exeLoadSQL), 2);
         } else {
             this.logger.error("not support {}", exeType);
-            throw new Exception("not support " + exeType);
+            throw new IllegalArgumentException();
         }
     }
 
     /**
-     * 将Rdb查询结果保存成文件，然后以load方式入hive
+     * 以load方式将文件入hive
      *
      * @param insertSQL 插入hive的SQL语句
      * @param sql       查询Rdb的SQL语句
@@ -89,7 +84,7 @@ public class Extract extends ETL {
             this.logger.debug(insertSQL);
         }
 
-        // 从insertSQL中分离出table,time_type；如果没有time_type，取默认1
+        // 从insertSQL中分离出table
         String timeType = String.valueOf(this.getTimeType());
         assert insertSQL != null;
         insertSQL = insertSQL.toLowerCase();
@@ -97,8 +92,9 @@ public class Extract extends ETL {
         if (table == null) {
             return;
         }
+
+        // 获取文件，执行load
         String fileName = Public.getTableDataDirectory(table, timeType) + table + ".txt";
-//        RdbLoad(sql, fileName);
         BiConsumer<String, String> func = this.db.getExport();
         func.accept(sql, fileName);
         Public.printDuration(start, LocalDateTime.now());

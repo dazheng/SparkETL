@@ -1,8 +1,10 @@
 package etl;
 
 import etl.export.ExportToDBDaily;
+import etl.export.ExportToEsInit;
 import etl.extract.ExtractFromDBDaily;
 import etl.transform.Tran;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +66,8 @@ public class Dispatch {
     }
 
     private void setSpark(String appName) {
-        this.spark = SparkSession.builder().appName(appName).enableHiveSupport().getOrCreate();
+        SparkConf sparkConf = new SparkConf().set("es.nodes", "db").set("es.port", "9200");
+        this.spark = SparkSession.builder().appName(appName).config(sparkConf).enableHiveSupport().getOrCreate();
     }
 
     /**
@@ -92,6 +95,26 @@ public class Dispatch {
                     break;
 
             }
+        } catch (Exception e) {
+            this.logger.error(e.toString(), e);
+        } finally {
+            this.spark.stop();
+            this.logger.info("timeID={} appName={} time taken {} s",
+                timeID, appName, Duration.between(start, LocalDateTime.now()).getSeconds());
+        }
+    }
+
+    public void tmp() {
+        String appName = "tmp";
+        LocalDateTime start = LocalDateTime.now();
+        try {
+            startLog(appName);
+            setSpark(appName);
+            ExportToEsInit dp = new ExportToEsInit(this.spark, this.timeType, this.timeID, this.backDate,
+                "es", this.timeType);
+            dp.dpInit();
+            dp.release();
+
         } catch (Exception e) {
             this.logger.error(e.toString(), e);
         } finally {

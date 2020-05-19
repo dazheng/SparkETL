@@ -15,6 +15,8 @@ public final class App {
             case "prod":
                 disp.prod();
                 break;
+            case "tmp":
+                disp.tmp();
             default:
                 break;
         }

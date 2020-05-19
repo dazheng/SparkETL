@@ -16,6 +16,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.function.BiConsumer;
 
+import org.elasticsearch.spark.sql.api.java.JavaEsSparkSQL;
+
+
+// hive建映射表： https://www.elastic.co/guide/en/elasticsearch/hadoop/current/hive.html
+
 public class Elasticsearch implements DB {
     private final Logger logger = LoggerFactory.getLogger(Rdb.class);
     private final String host;
@@ -57,7 +62,8 @@ public class Elasticsearch implements DB {
         if ("".equals(table)) {
             return;
         }
-        Dataset<Row> df = spark.read().format("org.elasticsearch.spark.sql")
+//        Dataset<Row> df = spark.read().format("org.elasticsearch.spark.sql")
+        Dataset<Row> df = spark.read().format("es")
             .option("es.nodes", this.host).option("es.port", this.port).option("pushdown", true)
             .load(table + "/_doc"); // { "query" : { "term" : { "user" : "costinl" } } }
         df.createOrReplaceTempView(table);
@@ -73,9 +79,10 @@ public class Elasticsearch implements DB {
      */
     @Override
     public void write(@NotNull Dataset<Row> df, String table) {
-        df.write().mode(SaveMode.Append).format("org.elasticsearch.spark.sql")
-            .option("es.nodes", host).option("es.port", this.port)
-            .save(table + "/_doc");
+//        df.write().mode(SaveMode.Append).format("org.elasticsearch.spark.sql")
+//            .option("es.nodes", host).option("es.port", this.port)
+//            .save(table + "/_doc");
+        JavaEsSparkSQL.saveToEs(df, "spark/docs"); // TODO：host需要在config中指定
     }
 
     @Override

@@ -1,6 +1,5 @@
 package etl.utils;
 
-import com.moandjiezana.toml.Toml;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -57,12 +56,12 @@ public class Export extends ETL {
     }
 
     /**
-     * SQL结果保存成Rdb表
+     * SQL结果保存成db表
      *
      * @param table
      * @param sql
      */
-    private void sqlToRdbTable(String table, String sql) {
+    private void sqlToDBTable(String table, String sql) {
         Dataset<Row> df = exeSQL(sql);
         this.db.write(df, table);
     }
@@ -76,7 +75,7 @@ public class Export extends ETL {
      */
     private void toRdbTableIncreate(String table, String sql) throws Exception {
         deleteRdbTable(table);
-        sqlToRdbTable(table, sql);
+        sqlToDBTable(table, sql);
     }
 
     /**
@@ -88,7 +87,7 @@ public class Export extends ETL {
      */
     private void toRdbTableFull(String table, String sql) throws Exception {
         this.db.exeSQL("truncate table " + table);
-        sqlToRdbTable(table, sql);
+        sqlToDBTable(table, sql);
     }
 
     /**
@@ -113,7 +112,7 @@ public class Export extends ETL {
         if (table == null || table.isEmpty()) {
             this.db.exeSQL(sql);
         } else {
-            sqlToRdbTable(table, sql);
+            sqlToDBTable(table, sql);
         }
     }
 

@@ -16,7 +16,7 @@
 * PostgreSQL 12.2  
 * DB2 11.5 # TODO
 * MongoDB 4.2.5  # TODO
-* Elasticsearch 7.6.2 # TODO 
+* Elasticsearch 7.6.2 # 用hive表映射方式，参考： https://www.elastic.co/guide/en/elasticsearch/hadoop/current/hive.html
 * Redis 5.0.8 # TODO
 * Apache Kudu 1.10.0 # TODO
 
@@ -29,5 +29,21 @@ spark-submit --master yarn --class etl.App --driver-memory 512m --executor-memor
 ### idea远程调试
 spark-submit --master yarn --class etl.App --driver-memory 512m --executor-memory 512m --driver-java-options "-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005" /dp/bin/etl.jar  prod 1 2020-03-23
 
+## 记录应用日志
+/etc/spark/conf/log4j.properties 增加
+```
+log4j.logger.etl=DEBUG,rollingFile
+log4j.appender.rollingFile=org.apache.log4j.RollingFileAppender
+log4j.appender.rollingFile.Threshold=DEBUG
+log4j.appender.rollingFile.ImmediateFlush=true
+log4j.appender.rollingFile.Append=true
+log4j.appender.rollingFile.File=/dp/log/etl.log
+log4j.appender.rollingFile.MaxFileSize=50MB
+log4j.appender.rollingFile.MaxBackupIndex=5
+log4j.appender.rollingFile.layout=org.apache.log4j.PatternLayout
+log4j.appender.rollingFile.layout.ConversionPattern=%d{yyyy-MM-dd HH:mm:ss} [%p] %m%n
+```
 ## 具体使用方式见
 [SparkETL 用Spark SQL实现ETL](https://blog.csdn.net/dazheng/article/details/105370358)
+
+

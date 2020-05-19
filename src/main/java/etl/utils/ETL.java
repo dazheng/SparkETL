@@ -201,7 +201,7 @@ public class ETL extends Time {
         FileSystem fileSystem = null;  //操作Hdfs核心类
         Configuration configuration = null;  //配置类
         Toml toml = Public.getParameters();
-        String HDFS_PATH = toml.getTable("base").getString("hdfs_path", "hdfs://master");
+        String HDFS_PATH = toml.getTable("base").getString("hdfs_path", "hdfs://localhost");
 
         try {
             // 创建路径，删除原来的数据

@@ -165,6 +165,12 @@
             <artifactId>jcc</artifactId>
             <version>11.5.0.0</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.elasticsearch/elasticsearch-hadoop -->
+        <dependency>
+            <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch-hadoop</artifactId>
+            <version>7.6.2</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.elasticsearch/elasticsearch-spark-20 -->
         <dependency>
             <groupId>org.elasticsearch</groupId>
@@ -177,11 +183,11 @@
 <!--            <artifactId>opendistro-sql-jdbc</artifactId>-->
 <!--            <version>1.6.0.0</version>-->
 <!--        </dependency>-->
-        <dependency>
-            <groupId>org.elasticsearch.plugin</groupId>
-            <artifactId>x-pack-sql-jdbc</artifactId>
-            <version>7.6.2</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.elasticsearch.plugin</groupId>-->
+<!--            <artifactId>x-pack-sql-jdbc</artifactId>-->
+<!--            <version>7.6.2</version>-->
+<!--        </dependency>-->
         <!-- https://mvnrepository.com/artifact/com.redislabs/spark-redis -->
         <dependency>
             <groupId>com.redislabs</groupId>

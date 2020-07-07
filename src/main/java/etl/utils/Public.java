@@ -37,12 +37,13 @@ public class Public {
     final static String DB_MONGODB = "mongo";
     final static String DB_ELASTICSEARCH = "es";
     final static String DB_REDIS = "redis";
+
     final static String DB_KUDU = "kudu";
 
 
     final static String[] TOML_DB_TABLE = {DB_Rdb, DB_MONGODB, DB_ELASTICSEARCH, DB_REDIS, DB_KUDU}; // conf.toml中包含的数据库种类
 
-    private static Toml toml = parseParameters(); // 获取解析后的toml配置文件
+    static Toml toml = parseParameters(); // 获取解析后的toml配置文件
 
     static String getMinusSep() {
         return MINUS_SEP;
@@ -112,8 +113,8 @@ public class Public {
      */
     public static String readSqlFile(String fileName) throws IOException {
         BufferedReader in =
-            new BufferedReader(new InputStreamReader(Objects.requireNonNull(
-                App.class.getClassLoader().getResourceAsStream(fileName))));
+                new BufferedReader(new InputStreamReader(Objects.requireNonNull(
+                        App.class.getClassLoader().getResourceAsStream(fileName))));
         StringBuilder sb = new StringBuilder();
         String line = "";
         Pattern p = Pattern.compile("\\s+");
@@ -140,8 +141,9 @@ public class Public {
      */
     private static Toml parseParameters() {
         InputStreamReader in =
-            new InputStreamReader(Objects.requireNonNull(App.class.getClassLoader().getResourceAsStream("conf.toml")));
-        return new Toml().read(in);
+                new InputStreamReader(Objects.requireNonNull(App.class.getClassLoader().getResourceAsStream("conf.toml")));
+        toml = new Toml().read(in);
+        return toml;
     }
 
     static Toml getParameters() {
@@ -336,7 +338,7 @@ public class Public {
             int pos1, pos2;
             String connUri, params = null;
             if (jdbcUrl == null || !jdbcUrl.startsWith("jdbc:")
-                || (pos1 = jdbcUrl.indexOf(':', 5)) == -1)
+                    || (pos1 = jdbcUrl.indexOf(':', 5)) == -1)
                 throw new IllegalArgumentException("Invalid JDBC url.");
             driverName = jdbcUrl.substring(5, pos1);
 
@@ -354,9 +356,9 @@ public class Public {
             } else if (params != null) {
                 // 如sqlserver
                 if ((pos1 = params.toLowerCase().indexOf("databasename=")) != -1) {
-                    if((pos2 = params.toLowerCase().indexOf(";", pos1))!=-1) {
+                    if ((pos2 = params.toLowerCase().indexOf(";", pos1)) != -1) {
                         database = params.substring(pos1 + 13, pos2);
-                    }else{
+                    } else {
                         database = params.substring(pos1 + 13);
                     }
                 } else {
